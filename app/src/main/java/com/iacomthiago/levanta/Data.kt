@@ -59,6 +59,9 @@ data class Config(
     val musicSeconds: Int = 60,
     /** Data da prova no formato dd/mm/aaaa; vazio desliga a contagem. */
     val examDate: String = DEFAULT_EXAM_DATE,
+    /** Avisa a hora de deitar para dormir [sleepMinutes] antes do próximo alarme. */
+    val bedtimeEnabled: Boolean = true,
+    val sleepMinutes: Int = 480,
 )
 
 /** Uma questão de certo ou errado do baralho em assets/questoes.json. */
@@ -253,6 +256,8 @@ object Repo {
             .put("musicFirst", value.musicFirst)
             .put("musicSeconds", value.musicSeconds)
             .put("examDate", value.examDate)
+            .put("bedtimeEnabled", value.bedtimeEnabled)
+            .put("sleepMinutes", value.sleepMinutes)
         prefs.edit().putString("config", o.toString()).apply()
     }
 
@@ -283,6 +288,8 @@ object Repo {
                 musicFirst = o.optBoolean("musicFirst", d.musicFirst),
                 musicSeconds = o.optInt("musicSeconds", d.musicSeconds),
                 examDate = o.optString("examDate", d.examDate),
+                bedtimeEnabled = o.optBoolean("bedtimeEnabled", d.bedtimeEnabled),
+                sleepMinutes = o.optInt("sleepMinutes", d.sleepMinutes),
             )
         } catch (e: Exception) {
             Config()

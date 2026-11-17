@@ -180,6 +180,14 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
             if (proximo != null) {
                 Text(hhmm(proximo.second), fontSize = 60.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas, lineHeight = 66.sp)
                 Text("${diaCurto(proximo.second)} · ${daquiA(proximo.second)}", fontSize = 16.sp, color = Cor.Texto)
+                val deitar = remember(alarmes, agora, Repo.config) { Scheduler.bedtime() }
+                if (deitar != null) {
+                    Text(
+                        "Para dormir ${duracao(Repo.config.sleepMinutes)}, deite até ${hhmm(deitar.first)}.",
+                        fontSize = 15.sp,
+                        color = Cor.Suave,
+                    )
+                }
             } else {
                 Espaco(6)
                 Text("Nenhum alarme ligado", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
@@ -506,6 +514,24 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                 "Depois da última checagem, abre o app do Claude neste tablet, se estiver instalado.",
                 c.openClaude,
             ) { Repo.updateConfig(c.copy(openClaude = it)) }
+        }
+
+        TituloSecao("Hora de dormir")
+        Cartao {
+            LinhaChave(
+                "Avisar a hora de dormir",
+                "Um toque meia hora antes e outro na hora de deitar, calculados a partir do próximo alarme.",
+                c.bedtimeEnabled,
+            ) {
+                Repo.updateConfig(c.copy(bedtimeEnabled = it))
+                Scheduler.rescheduleAll(context)
+            }
+            if (c.bedtimeEnabled) {
+                LinhaNumero("Horas de sono", c.sleepMinutes, 300..600, passo = 30, rotulo = { duracao(it) }) {
+                    Repo.updateConfig(c.copy(sleepMinutes = it))
+                    Scheduler.rescheduleAll(context)
+                }
+            }
         }
 
         TituloSecao("Prova")

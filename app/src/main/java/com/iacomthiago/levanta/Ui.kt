@@ -303,3 +303,7 @@ fun fraseDaProva(texto: String): String? = when (val dias = diasParaProva(texto)
     1L -> "Falta 1 dia para a prova."
     else -> "Faltam $dias dias para a prova."
 }
+
+/** "8 h" ou "7 h 30", a partir de minutos. */
+fun duracao(minutos: Int): String =
+    if (minutos % 60 == 0) "${minutos / 60} h" else "${minutos / 60} h ${minutos % 60}"

@@ -17,6 +17,8 @@ Feito para ficar num tablet **longe da cama**, no carregador.
 4. **Checagem.** Minutos depois, o tablet pergunta "você continua de pé?". Sem resposta em 45 segundos, é recaída: o alarme volta e a missão recomeça.
 5. **Fim.** Passou pela checagem, o despertar entra no histórico, a tela de bom dia mostra quantos dias faltam para a prova e, se você quiser, o app do Claude abre em seguida.
 
+Na véspera, o app também avisa a **hora de dormir**: um toque meia hora antes e outro na hora de deitar, calculados para você dormir as horas combinadas (8 por padrão) antes do próximo alarme.
+
 Se ninguém atender em 20 minutos, o alarme desiste e registra "sem resposta" no histórico. Reiniciar o tablet no meio não adianta: ao ligar de novo, o alarme retoma.
 
 Tudo é configurável em **Ajustes**: quais missões, quantos acertos e quantas contas, a frase, a afirmação, a data da prova, número de checagens e intervalo, sonecas permitidas (o padrão é nenhuma), música de abertura e volume crescente. Lá também dá para treinar as duas missões surpresa fora do alarme.

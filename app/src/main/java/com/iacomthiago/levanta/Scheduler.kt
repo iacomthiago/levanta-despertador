@@ -1,10 +1,16 @@
 package com.iacomthiago.levanta
 
 import android.app.AlarmManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
+import android.net.Uri
+import android.util.Log
+import androidx.core.app.NotificationCompat
 import java.time.LocalTime
 import java.time.ZonedDateTime
 
@@ -12,10 +18,16 @@ import java.time.ZonedDateTime
 object Scheduler {
     const val ACTION_ALARM = "com.iacomthiago.levanta.action.ALARM"
     const val ACTION_EVENT = "com.iacomthiago.levanta.action.EVENT"
+    const val ACTION_BEDTIME = "com.iacomthiago.levanta.action.BEDTIME"
+
+    /** O primeiro aviso de dormir sai meia hora antes da hora de deitar. */
+    const val BEDTIME_WARNING_MS = 30 * 60_000L
 
     private const val REQUEST_EVENT = 900_001
     private const val REQUEST_TEST = 900_002
     private const val REQUEST_SHOW = 900_003
+    private const val REQUEST_BED_WARNING = 900_004
+    private const val REQUEST_BED_NOW = 900_005
 
     private val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
@@ -47,6 +59,44 @@ object Scheduler {
                 setExact(context, trigger, PendingIntent.getBroadcast(context, alarm.id, intent, flags))
             } else {
                 cancel(context, alarm.id)
+            }
+        }
+        scheduleBedtime(context)
+    }
+
+    /**
+     * Hora de deitar para dormir o combinado antes do próximo alarme, junto com
+     * a hora desse alarme. Nulo se o aviso está desligado ou não há alarme ligado.
+     */
+    fun bedtime(): Pair<Long, Long>? {
+        if (!Repo.config.bedtimeEnabled) return null
+        val proximo = nextAlarm(Repo.alarms) ?: return null
+        val sono = Repo.config.sleepMinutes.coerceIn(240, 720) * 60_000L
+        return (proximo.second - sono) to proximo.second
+    }
+
+    /** Agenda os dois avisos de dormir (meia hora antes e na hora); os que já passaram são cancelados. */
+    private fun scheduleBedtime(context: Context) {
+        val am = manager(context)
+        val plano = bedtime()
+        val agora = System.currentTimeMillis()
+        for ((pedido, antecedencia) in listOf(REQUEST_BED_WARNING to BEDTIME_WARNING_MS, REQUEST_BED_NOW to 0L)) {
+            val intent = Intent(context, AlarmReceiver::class.java).setAction(ACTION_BEDTIME)
+            if (plano == null || plano.first - antecedencia <= agora) {
+                am.cancel(PendingIntent.getBroadcast(context, pedido, intent, flags))
+                continue
+            }
+            intent.putExtra("aviso", antecedencia > 0L)
+                .putExtra("deitar", plano.first)
+                .putExtra("alarme", plano.second)
+            val quando = plano.first - antecedencia
+            val operacao = PendingIntent.getBroadcast(context, pedido, intent, flags)
+            try {
+                // Não usa setAlarmClock: o aviso de dormir não deve aparecer no
+                // sistema como se fosse o próximo despertador.
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quando, operacao)
+            } catch (e: SecurityException) {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, quando, operacao)
             }
         }
     }
@@ -104,6 +154,13 @@ class AlarmReceiver : BroadcastReceiver() {
             }
 
             Scheduler.ACTION_EVENT -> AlarmService.send(context, AlarmService.ACTION_EVENT)
+
+            Scheduler.ACTION_BEDTIME -> Dormir.avisar(
+                context,
+                aviso = intent.getBooleanExtra("aviso", false),
+                deitar = intent.getLongExtra("deitar", 0L),
+                alarme = intent.getLongExtra("alarme", 0L),
+            )
         }
     }
 }
@@ -115,5 +172,57 @@ class BootReceiver : BroadcastReceiver() {
         Scheduler.rescheduleAll(context)
         // Reiniciar o tablet não é saída: se havia um alarme tocando, ele volta.
         AlarmService.resumeIfNeeded(context)
+    }
+}
+
+/** Notificação com um toque suave avisando que está na hora de ir dormir. */
+object Dormir {
+    private const val CANAL = "dormir"
+    private const val ID = 77
+
+    fun avisar(context: Context, aviso: Boolean, deitar: Long, alarme: Long) {
+        // Só vale se o plano continua o mesmo: o alarme pode ter mudado ou sido desligado.
+        val plano = Scheduler.bedtime() ?: return
+        if (kotlin.math.abs(plano.second - alarme) > 60_000L) return
+        if (Repo.session != null) return
+
+        val nm = context.getSystemService(NotificationManager::class.java)
+        if (nm.getNotificationChannel(CANAL) == null) {
+            val canal = NotificationChannel(CANAL, "Hora de dormir", NotificationManager.IMPORTANCE_HIGH)
+            canal.description = "Avisa a hora de deitar para dormir o suficiente antes do alarme."
+            // O toque sai pelo volume de alarme, para ser ouvido mesmo com a mídia baixa.
+            canal.setSound(
+                Uri.parse("android.resource://" + context.packageName + "/" + R.raw.chime),
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+            nm.createNotificationChannel(canal)
+        }
+
+        val titulo = if (aviso) "Hora de dormir em 30 minutos" else "Hora de dormir"
+        val texto = "Alarme às ${hhmm(alarme)}. Deitando às ${hhmm(deitar)} você dorme ${duracao(Repo.config.sleepMinutes)}."
+        val abrir = PendingIntent.getActivity(
+            context,
+            2,
+            Intent(context, MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notificacao = NotificationCompat.Builder(context, CANAL)
+            .setSmallIcon(R.drawable.ic_stat_alarm)
+            .setContentTitle(titulo)
+            .setContentText(texto)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(texto))
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(abrir)
+            .build()
+        try {
+            nm.notify(ID, notificacao)
+        } catch (e: Exception) {
+            Log.w("Levanta", "Não foi possível avisar a hora de dormir", e)
+        }
     }
 }

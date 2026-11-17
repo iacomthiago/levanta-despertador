@@ -181,6 +181,54 @@ def cumprir_missoes(prefixo):
     return False
 
 
+def avisos_de_dormir():
+    return sh("dumpsys notification --noredact | grep -E 'android.title=.*Hora de dormir' | head -5").strip()
+
+
+def conferir_hora_de_dormir():
+    """Adianta o relógio do emulador e confere os dois avisos de dormir."""
+    tocar_em("Fechar", 10)
+    adb("root")
+    time.sleep(5)
+    adb("wait-for-device")
+    sh("settings put global auto_time 0")
+    dia = sh("date +%m%d").strip()
+    ano = sh("date +%Y").strip()
+    # 21:58:00. Com o alarme padrão das 06:30 e 8 h de sono, deitar é às 22:30.
+    sh(f"date {dia}2158{ano}.00")
+    log("relógio do emulador: " + sh("date").strip())
+    sh(f"am start -n {PKG}/.MainActivity")
+    time.sleep(3)
+    if not tocar_em("Novo alarme"):
+        return
+    if not tocar_em("Salvar alarme"):
+        return
+    time.sleep(2)
+    ts = textos(dump())
+    shot("15-hora-de-dormir")
+    if not any("deite até 22:30" in t for t in ts):
+        problemas.append(f"A tela inicial não mostra a hora de deitar: {ts}")
+
+    fim = time.time() + 170
+    achou = ""
+    while time.time() < fim and "em 30 minutos" not in achou:
+        time.sleep(5)
+        achou = avisos_de_dormir()
+    log(f"aviso de meia hora antes: {achou!r} (relógio {sh('date +%H:%M:%S').strip()})")
+    if "em 30 minutos" not in achou:
+        problemas.append(f"O aviso de dormir de meia hora antes não apareceu: {achou!r}")
+
+    sh(f"date {dia}2229{ano}.40")
+    fim = time.time() + 90
+    achou = ""
+    while time.time() < fim and "(Hora de dormir)" not in achou:
+        time.sleep(5)
+        achou = avisos_de_dormir()
+    log(f"aviso da hora de deitar: {achou!r} (relógio {sh('date +%H:%M:%S').strip()})")
+    if "(Hora de dormir)" not in achou:
+        problemas.append(f"O aviso da hora de dormir não apareceu: {achou!r}")
+
+
 def main():
     apk = sys.argv[1]
     os.makedirs(OUT, exist_ok=True)
@@ -297,6 +345,8 @@ def main():
         if esperar("Você continua de pé?", 50):
             tocar_em("Estou de pé")
             esperar("Você levantou.", 20)
+
+    conferir_hora_de_dormir()
 
 
 if __name__ == "__main__":
