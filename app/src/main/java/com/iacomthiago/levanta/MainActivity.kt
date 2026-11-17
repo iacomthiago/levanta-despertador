@@ -36,6 +36,7 @@ import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerLayoutType
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -158,6 +159,22 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
         }
         Espaco(16)
 
+        LaunchedEffect(Unit) { Atualizacao.verificar(context) }
+        val nova = Atualizacao.nova
+        if (nova != null) {
+            Cartao {
+                Text("Versão nova disponível: ${nova.nome}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas)
+                Text(
+                    "Você está na ${Atualizacao.nomeInstalado(context)}. Seus alarmes e ajustes continuam.",
+                    fontSize = 14.sp,
+                    color = Cor.Suave,
+                )
+                Espaco(12)
+                BotaoDeAtualizar()
+            }
+            Espaco(12)
+        }
+
         Cartao(cor = Cor.CartaoAlto) {
             Text("PRÓXIMO ALARME", color = Cor.Suave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
             if (proximo != null) {
@@ -214,6 +231,21 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
             )
         }
         Espaco(20)
+    }
+}
+
+/** Botão que baixa a versão nova e abre o instalador do Android, com o andamento do download. */
+@Composable
+private fun BotaoDeAtualizar() {
+    val context = LocalContext.current
+    val progresso = Atualizacao.progresso
+    BotaoPrincipal(
+        if (progresso == null) "Atualizar agora" else "Baixando… $progresso%",
+        habilitado = progresso == null,
+    ) { Atualizacao.atualizar(context) }
+    val aviso = Atualizacao.aviso
+    if (aviso != null) {
+        Text(aviso, fontSize = 14.sp, color = Cor.Ouro, modifier = Modifier.padding(top = 8.dp))
     }
 }
 
@@ -479,6 +511,24 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                 color = Cor.Suave,
                 modifier = Modifier.padding(top = 6.dp),
             )
+        }
+
+        TituloSecao("Sobre o app")
+        Cartao {
+            Text("Versão instalada: ${Atualizacao.nomeInstalado(context)}", fontSize = 17.sp)
+            Espaco(10)
+            val nova = Atualizacao.nova
+            if (nova != null) {
+                Text("Versão nova disponível: ${nova.nome}", fontSize = 15.sp, color = Cor.Lilas)
+                Espaco(8)
+                BotaoDeAtualizar()
+            } else {
+                BotaoSecundario("Procurar atualização") { Atualizacao.verificar(context, forcar = true) }
+                val aviso = Atualizacao.aviso
+                if (aviso != null) {
+                    Text(aviso, fontSize = 14.sp, color = Cor.Suave, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
         }
 
         TituloSecao("Som e soneca")

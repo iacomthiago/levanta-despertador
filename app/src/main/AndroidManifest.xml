@@ -29,6 +29,10 @@
         android:name="android.hardware.camera.autofocus"
         android:required="false" />
 
+    <!-- Atualização por dentro do app: consultar o GitHub, baixar e abrir o instalador -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
     <!-- Missão surpresa de falar a afirmação em voz alta -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
@@ -95,6 +99,16 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+        <!-- Entrega o instalador baixado à tela de instalação do Android -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.arquivos"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/caminhos" />
+        </provider>
     </application>
 
 </manifest>

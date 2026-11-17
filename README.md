@@ -28,7 +28,7 @@ Tudo é configurável em **Ajustes**: quais missões, quantos acertos e quantas 
 3. O Android vai avisar que o navegador não pode instalar apps. Toque em **Configurações**, ligue **Permitir desta fonte** e volte.
 4. Toque em **Instalar**. Se o Play Protect perguntar, escolha **Instalar mesmo assim** (o app não está na loja, por isso o aviso).
 
-Para atualizar, repita os passos com a versão nova: ela instala por cima e mantém alarmes e histórico.
+Para atualizar, não precisa voltar ao site: quando existe versão nova, o app mostra um cartão **Versão nova disponível** na tela inicial. Toque em **Atualizar agora**, espere o download e confirme em **Atualizar** na tela do Android (na primeira vez ele pede para permitir instalações a partir do Levanta). A versão nova entra por cima e mantém alarmes e histórico. Em **Ajustes > Sobre o app** dá para conferir a versão instalada e procurar atualização na hora.
 
 ## Preparar o tablet (uma vez)
 
@@ -65,6 +65,7 @@ O projeto é Kotlin com Jetpack Compose, sem dependência de serviços do Google
   - `Missions.kt`: questões, contas, frase, leitura de código, fala e memória.
 - `app/src/main/assets/questoes.json`: o baralho de questões de certo ou errado. Cada item tem a afirmação, o gabarito e a explicação com o artigo.
   - `MainActivity.kt`, `Setup.kt`, `Ui.kt`: telas do app, permissões e componentes.
+  - `Atualizacao.kt`: consulta a última versão publicada no GitHub, baixa o instalador e abre a instalação.
 - `.github/workflows/build.yml`: a cada envio para `main`, o GitHub compila o APK, roda `ci/smoke.py` num emulador (alarme de ponta a ponta, com capturas de tela) e, se passar, publica uma versão nova. As missões de fala e de memória ficam fora desse teste: o emulador não fala nem enxerga a sequência.
 - `ci/make_sounds.py`: gera os sons do alarme e da checagem.
 

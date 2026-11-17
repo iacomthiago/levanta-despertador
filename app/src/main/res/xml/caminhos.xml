@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Única pasta que o app compartilha com o instalador do Android: a do download da atualização. -->
+<paths>
+    <cache-path
+        name="atualizacao"
+        path="atualizacao/" />
+</paths>
