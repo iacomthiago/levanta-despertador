@@ -21,7 +21,7 @@ Tudo é configurável em **Ajustes**: quais missões, quantas contas e a dificul
 
 ## Instalar no tablet
 
-1. No tablet, abra a página de versões do repositório: `https://github.com/iacomthiago/levanta-despertador/releases/latest`. Se o repositório estiver privado, entre na sua conta do GitHub no navegador do tablet.
+1. No tablet, abra a página de versões do repositório: https://github.com/iacomthiago/levanta-despertador/releases/latest
 2. Baixe o arquivo **levanta.apk** e toque nele.
 3. O Android vai avisar que o navegador não pode instalar apps. Toque em **Configurações**, ligue **Permitir desta fonte** e volte.
 4. Toque em **Instalar**. Se o Play Protect perguntar, escolha **Instalar mesmo assim** (o app não está na loja, por isso o aviso).
