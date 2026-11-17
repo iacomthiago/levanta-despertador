@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sol nascendo sobre a linha do horizonte. Área segura do ícone: círculo de 66dp no centro. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Meio sol -->
+    <path
+        android:fillColor="#FFB547"
+        android:pathData="M38,62 A16,16 0 0 1 70,62 Z" />
+
+    <!-- Raios -->
+    <path
+        android:pathData="M54,32 L54,39 M33,41 L38,46 M75,41 L70,46 M26,58 L32,58 M82,58 L76,58"
+        android:strokeColor="#FFB547"
+        android:strokeLineCap="round"
+        android:strokeWidth="4" />
+
+    <!-- Horizonte -->
+    <path
+        android:pathData="M29,67 L79,67"
+        android:strokeColor="#E8ECF4"
+        android:strokeLineCap="round"
+        android:strokeWidth="4" />
+    <path
+        android:pathData="M40,75 L68,75"
+        android:strokeColor="#6FD6C0"
+        android:strokeLineCap="round"
+        android:strokeWidth="4" />
+</vector>

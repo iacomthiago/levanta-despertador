@@ -1,0 +1,16 @@
+.gradle/
+build/
+app/build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+
+# Chave de assinatura: nunca vai para o repositório
+.keystore/
+*.p12
+*.jks
+*.keystore
+
+# Saída do teste automático
+ci-out/
