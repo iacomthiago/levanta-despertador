@@ -9,6 +9,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,11 +22,15 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
@@ -293,6 +301,16 @@ private fun TelaFim(
     Pagina(centralizar = true) {
         if (ok) {
             val minutos = ((resultado.upAt - resultado.startedAt).coerceAtLeast(0L) / 60_000L).toInt()
+            Image(
+                painter = painterResource(R.drawable.carro),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(16f / 9f)
+                    .clip(RoundedCornerShape(20.dp)),
+            )
+            Espaco(18)
             Text("BOM DIA", color = Cor.Verde, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
             Espaco(8)
             Text("Você levantou.", fontSize = 36.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
@@ -323,6 +341,11 @@ private fun TelaFim(
                     color = Cor.Lilas,
                     fontWeight = FontWeight.SemiBold,
                 )
+            }
+            val prova = fraseDaProva(Repo.config.examDate)
+            if (prova != null) {
+                Espaco(6)
+                Text(prova, fontSize = 18.sp, color = Cor.Ouro, fontWeight = FontWeight.SemiBold)
             }
         } else {
             Text("SEM RESPOSTA", color = Cor.Vermelho, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)

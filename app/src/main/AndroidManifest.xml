@@ -29,9 +29,19 @@
         android:name="android.hardware.camera.autofocus"
         android:required="false" />
 
-    <!-- Para abrir o Claude quando a missão termina -->
+    <!-- Missão surpresa de falar a afirmação em voz alta -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-feature
+        android:name="android.hardware.microphone"
+        android:required="false" />
+
+    <!-- Para abrir o Claude quando a missão termina e para achar o serviço de voz do aparelho -->
     <queries>
         <package android:name="com.anthropic.claude" />
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
     </queries>
 
     <application

@@ -10,6 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 const val DEFAULT_PHRASE = "Eu levanto agora e cumpro o que prometi"
+const val DEFAULT_AFFIRMATION = "Eu vou conseguir. Eu vou ser aprovado."
+const val DEFAULT_EXAM_DATE = "13/12/2026"
 
 class App : Application() {
     override fun onCreate() {
@@ -43,7 +45,30 @@ data class Config(
     val maxSnoozes: Int = 0,
     val snoozeMinutes: Int = 5,
     val openClaude: Boolean = true,
+    /** Questões de certo ou errado do concurso; [quizCount] é o número de acertos exigido. */
+    val quizEnabled: Boolean = true,
+    val quizCount: Int = 5,
+    /** Missão extra sorteada a cada despertar (falar a afirmação ou memória). */
+    val surpriseEnabled: Boolean = true,
+    val affirmation: String = DEFAULT_AFFIRMATION,
+    /** Começa com a música; depois de [musicSeconds] sem missão cumprida, vira o bipe. */
+    val musicFirst: Boolean = true,
+    val musicSeconds: Int = 60,
+    /** Data da prova no formato dd/mm/aaaa; vazio desliga a contagem. */
+    val examDate: String = DEFAULT_EXAM_DATE,
 )
+
+/** Uma questão de certo ou errado do baralho em assets/questoes.json. */
+data class Questao(
+    val id: String,
+    val materia: String,
+    val texto: String,
+    val certo: Boolean,
+    val porque: String,
+)
+
+/** Última vez que uma questão apareceu e se a resposta foi certa. */
+data class Desempenho(val vistaEm: Long, val acertou: Boolean)
 
 object Phase {
     /** Tocando; só a missão faz parar. */
@@ -125,6 +150,14 @@ object Repo {
     @Volatile
     var missionStartedAt = 0L
 
+    /** Silêncio total por alguns segundos, para o microfone ouvir a afirmação. */
+    @Volatile
+    var silenceUntil = 0L
+
+    /** Desempenho por questão, para trazer primeiro as erradas e as nunca vistas. */
+    var quizStats = mapOf<String, Desempenho>()
+        private set
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         prefs = context.applicationContext.getSharedPreferences("levanta", Context.MODE_PRIVATE)
@@ -132,6 +165,7 @@ object Repo {
         config = readConfig()
         session = readSession()
         history = readHistory()
+        quizStats = readQuizStats()
     }
 
     // ---------- alarmes ----------
@@ -208,6 +242,13 @@ object Repo {
             .put("maxSnoozes", value.maxSnoozes)
             .put("snoozeMinutes", value.snoozeMinutes)
             .put("openClaude", value.openClaude)
+            .put("quizEnabled", value.quizEnabled)
+            .put("quizCount", value.quizCount)
+            .put("surpriseEnabled", value.surpriseEnabled)
+            .put("affirmation", value.affirmation)
+            .put("musicFirst", value.musicFirst)
+            .put("musicSeconds", value.musicSeconds)
+            .put("examDate", value.examDate)
         prefs.edit().putString("config", o.toString()).apply()
     }
 
@@ -230,6 +271,13 @@ object Repo {
                 maxSnoozes = o.optInt("maxSnoozes", d.maxSnoozes),
                 snoozeMinutes = o.optInt("snoozeMinutes", d.snoozeMinutes),
                 openClaude = o.optBoolean("openClaude", d.openClaude),
+                quizEnabled = o.optBoolean("quizEnabled", d.quizEnabled),
+                quizCount = o.optInt("quizCount", d.quizCount),
+                surpriseEnabled = o.optBoolean("surpriseEnabled", d.surpriseEnabled),
+                affirmation = o.optString("affirmation", d.affirmation),
+                musicFirst = o.optBoolean("musicFirst", d.musicFirst),
+                musicSeconds = o.optInt("musicSeconds", d.musicSeconds),
+                examDate = o.optString("examDate", d.examDate),
             )
         } catch (e: Exception) {
             Config()
@@ -298,6 +346,7 @@ object Repo {
         prefs.edit().remove("session").commit()
         lastResult = entry
         quietUntil = 0L
+        silenceUntil = 0L
         if (!s.test) {
             history = (listOf(entry) + history).take(400)
             writeHistory()
@@ -352,6 +401,39 @@ object Repo {
         prefs.edit().remove("history").apply()
     }
 
+    // ---------- questões e missão surpresa ----------
+
+    fun recordAnswer(id: String, acertou: Boolean) {
+        quizStats = quizStats + (id to Desempenho(System.currentTimeMillis(), acertou))
+        val o = JSONObject()
+        for ((chave, d) in quizStats) {
+            o.put(chave, JSONObject().put("t", d.vistaEm).put("ok", d.acertou))
+        }
+        prefs.edit().putString("quizStats", o.toString()).apply()
+    }
+
+    private fun readQuizStats(): Map<String, Desempenho> {
+        val raw = prefs.getString("quizStats", null) ?: return emptyMap()
+        return try {
+            val o = JSONObject(raw)
+            buildMap {
+                for (chave in o.keys()) {
+                    val d = o.getJSONObject(chave)
+                    put(chave, Desempenho(d.optLong("t", 0L), d.optBoolean("ok", false)))
+                }
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    /** Qual missão surpresa saiu da última vez, para não repetir em seguida. */
+    var lastSurprise: String
+        get() = prefs.getString("lastSurprise", "") ?: ""
+        set(value) {
+            prefs.edit().putString("lastSurprise", value).apply()
+        }
+
     /** Dias seguidos (do mais recente para trás) em que a missão foi cumprida. */
     fun streak(): Int = history.takeWhile { it.outcome == Outcome.OK }.size
 
@@ -360,5 +442,51 @@ object Repo {
         val done = history.filter { it.outcome == Outcome.OK && it.upAt > 0L }.take(last)
         if (done.isEmpty()) return null
         return (done.map { (it.upAt - it.startedAt) / 60000.0 }.average()).toInt()
+    }
+}
+
+/** Baralho de questões de certo ou errado, lido uma vez de assets/questoes.json. */
+object Questoes {
+    private var cache: List<Questao>? = null
+
+    fun todas(context: Context): List<Questao> {
+        cache?.let { return it }
+        val lista = try {
+            val texto = context.applicationContext.assets.open("questoes.json").bufferedReader(Charsets.UTF_8).use { it.readText() }
+            val arr = JSONArray(texto)
+            (0 until arr.length()).map { i ->
+                val o = arr.getJSONObject(i)
+                Questao(
+                    id = o.getString("id"),
+                    materia = o.optString("materia", ""),
+                    texto = o.getString("texto"),
+                    certo = o.getBoolean("certo"),
+                    porque = o.optString("porque", ""),
+                )
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+        cache = lista
+        return lista
+    }
+
+    /**
+     * Ordem em que as questões aparecem hoje: primeiro as que foram erradas da
+     * última vez, depois as nunca vistas, depois as acertadas há mais tempo.
+     * Dentro de cada grupo a ordem é sorteada.
+     */
+    fun fila(context: Context): List<Questao> {
+        val stats = Repo.quizStats
+        return todas(context).shuffled().sortedWith(
+            compareBy<Questao> {
+                val d = stats[it.id]
+                when {
+                    d == null -> 1
+                    !d.acertou -> 0
+                    else -> 2
+                }
+            }.thenBy { stats[it.id]?.vistaEm ?: 0L }
+        )
     }
 }

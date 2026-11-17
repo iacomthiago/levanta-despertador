@@ -36,8 +36,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 // Paleta do site iacomthiago.com.br: roxo da marca sobre fundo quase preto.
@@ -283,4 +285,21 @@ fun resumoDias(dias: Set<Int>): String {
         d == setOf(6, 7) -> "Fim de semana"
         else -> d.sorted().joinToString(", ") { nomeDia(it) }
     }
+}
+
+private val formatoData = DateTimeFormatter.ofPattern("d/M/uuuu")
+
+/** Dias até a data da prova ("dd/mm/aaaa"); nulo se a data for inválida ou já tiver passado. */
+fun diasParaProva(texto: String): Long? = try {
+    val dia = LocalDate.parse(texto.trim(), formatoData)
+    ChronoUnit.DAYS.between(LocalDate.now(), dia).takeIf { it >= 0L }
+} catch (e: Exception) {
+    null
+}
+
+fun fraseDaProva(texto: String): String? = when (val dias = diasParaProva(texto)) {
+    null -> null
+    0L -> "A prova é hoje."
+    1L -> "Falta 1 dia para a prova."
+    else -> "Faltam $dias dias para a prova."
 }

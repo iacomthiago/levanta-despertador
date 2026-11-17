@@ -55,6 +55,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Repo.init(this)
+        // Usado só pelo teste automático, que não consegue falar nem ver a sequência de memória.
+        if (intent?.getBooleanExtra("sem_surpresa", false) == true) {
+            Repo.updateConfig(Repo.config.copy(surpriseEnabled = false))
+        }
         Scheduler.rescheduleAll(this)
         AlarmService.resumeIfNeeded(this)
         setContent {
@@ -79,6 +83,7 @@ private sealed interface Tela {
     data object Ajustes : Tela
     data object Historico : Tela
     data object Cadastro : Tela
+    data class Treino(val passo: String) : Tela
 }
 
 @Composable
@@ -86,7 +91,7 @@ private fun AppPrincipal() {
     var tela by remember { mutableStateOf<Tela>(Tela.Inicio) }
 
     BackHandler(enabled = tela != Tela.Inicio) {
-        tela = if (tela == Tela.Cadastro) Tela.Ajustes else Tela.Inicio
+        tela = if (tela == Tela.Cadastro || tela is Tela.Treino) Tela.Ajustes else Tela.Inicio
     }
 
     when (val atual = tela) {
@@ -97,7 +102,13 @@ private fun AppPrincipal() {
         )
 
         is Tela.Editar -> TelaEditar(atual.alarme, onVoltar = { tela = Tela.Inicio })
-        is Tela.Ajustes -> TelaAjustes(onVoltar = { tela = Tela.Inicio }, onCadastrar = { tela = Tela.Cadastro })
+        is Tela.Ajustes -> TelaAjustes(
+            onVoltar = { tela = Tela.Inicio },
+            onCadastrar = { tela = Tela.Cadastro },
+            onTreinar = { tela = Tela.Treino(it) },
+        )
+
+        is Tela.Treino -> TelaTreino(atual.passo, onVoltar = { tela = Tela.Ajustes })
         is Tela.Historico -> TelaHistorico(onVoltar = { tela = Tela.Inicio })
         is Tela.Cadastro -> TelaCadastro(onVoltar = { tela = Tela.Ajustes })
     }
@@ -161,6 +172,11 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
                 Numero(Repo.streak().toString(), "despertares seguidos", Modifier.weight(1f))
                 val media = remember(historico) { Repo.averageMinutesToGetUp() }
                 Numero(if (media == null) "–" else "$media min", "média para levantar", Modifier.weight(1f))
+            }
+            val prova = fraseDaProva(Repo.config.examDate)
+            if (prova != null) {
+                Espaco(12)
+                Text(prova, color = Cor.Ouro, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -298,10 +314,14 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
 // ---------- ajustes ----------
 
 @Composable
-private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit) {
+private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar: (String) -> Unit) {
     val context = LocalContext.current
     val c = Repo.config
     val niveis = listOf("Fácil", "Média", "Difícil")
+    var microfone by remember { mutableStateOf(microfoneLiberado(context)) }
+    val pedirMicrofone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        microfone = ok
+    }
 
     val pedirCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) onCadastrar()
@@ -314,6 +334,23 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit) {
         Cabecalho("Ajustes", onVoltar)
 
         TituloSecao("Missões para desligar")
+        Cartao {
+            LinhaChave(
+                "Questões do concurso",
+                "Certo ou errado de Constituição e Licitações. Errou, lê a explicação e responde outra.",
+                c.quizEnabled,
+            ) { Repo.updateConfig(c.copy(quizEnabled = it)) }
+            if (c.quizEnabled) {
+                LinhaNumero("Acertos para desligar", c.quizCount, 3..10) { Repo.updateConfig(c.copy(quizCount = it)) }
+                Text(
+                    "Baralho com ${Questoes.todas(context).size} questões. Primeiro vêm as que você errou e as que ainda não viu.",
+                    fontSize = 13.sp,
+                    color = Cor.Suave,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        Espaco(10)
         Cartao {
             LinhaChave("Contas de matemática", "Resolver contas num teclado na tela.", c.mathEnabled) {
                 Repo.updateConfig(c.copy(mathEnabled = it))
@@ -367,6 +404,44 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit) {
             Espaco(10)
             BotaoSecundario(if (temCodigo) "Trocar o código" else "Cadastrar um código") { cadastrar() }
         }
+        Espaco(10)
+        Cartao {
+            LinhaChave(
+                "Missão surpresa",
+                "Uma missão extra sorteada a cada despertar: falar sua afirmação em voz alta ou repetir uma sequência de memória.",
+                c.surpriseEnabled,
+            ) { Repo.updateConfig(c.copy(surpriseEnabled = it)) }
+            if (c.surpriseEnabled) {
+                Espaco(6)
+                OutlinedTextField(
+                    value = c.affirmation,
+                    onValueChange = { Repo.updateConfig(c.copy(affirmation = it.take(120))) },
+                    label = { Text("Sua afirmação") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Espaco(8)
+                if (!microfone) {
+                    Text(
+                        "Para o tablet ouvir a afirmação, libere o microfone. Sem isso, a surpresa é sempre a de memória.",
+                        fontSize = 14.sp,
+                        color = Cor.Ouro,
+                    )
+                    Espaco(8)
+                    BotaoSecundario("Liberar o microfone") { pedirMicrofone.launch(Manifest.permission.RECORD_AUDIO) }
+                    Espaco(8)
+                } else if (!vozDisponivel(context)) {
+                    Text(
+                        "Este tablet não tem reconhecimento de voz ativo; a surpresa será sempre a de memória.",
+                        fontSize = 14.sp,
+                        color = Cor.Ouro,
+                    )
+                    Espaco(8)
+                }
+                BotaoSecundario("Treinar: falar a afirmação") { onTreinar(PASSO_VOZ) }
+                Espaco(8)
+                BotaoSecundario("Treinar: memória") { onTreinar(PASSO_MEMORIA) }
+            }
+        }
 
         TituloSecao("Depois da missão")
         Cartao {
@@ -388,8 +463,36 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit) {
             ) { Repo.updateConfig(c.copy(openClaude = it)) }
         }
 
+        TituloSecao("Prova")
+        Cartao {
+            OutlinedTextField(
+                value = c.examDate,
+                onValueChange = { Repo.updateConfig(c.copy(examDate = it.take(10))) },
+                singleLine = true,
+                label = { Text("Data da prova (dd/mm/aaaa)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                fraseDaProva(c.examDate)
+                    ?: if (c.examDate.isBlank()) "Sem data, a contagem não aparece." else "Data inválida ou que já passou.",
+                fontSize = 14.sp,
+                color = Cor.Suave,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+
         TituloSecao("Som e soneca")
         Cartao {
+            LinhaChave(
+                "Começar com a abertura do HOTARU",
+                "A música toca primeiro. Se a missão não for cumprida a tempo, entra o bipe.",
+                c.musicFirst,
+            ) { Repo.updateConfig(c.copy(musicFirst = it)) }
+            if (c.musicFirst) {
+                LinhaNumero("Tempo de música", c.musicSeconds, 30..90, passo = 15, rotulo = { "$it s" }) {
+                    Repo.updateConfig(c.copy(musicSeconds = it))
+                }
+            }
             LinhaChave("Volume crescente", "Começa baixo e chega ao máximo em 45 segundos.", c.gradualVolume) {
                 Repo.updateConfig(c.copy(gradualVolume = it))
             }
@@ -447,6 +550,32 @@ private fun TelaCadastro(onVoltar: () -> Unit) {
             BotaoSecundario("Ler outro") { lido = null }
         }
         Espaco(20)
+    }
+}
+
+// ---------- treino das missões surpresa ----------
+
+/** Deixa experimentar uma missão surpresa fora do alarme, para conferir que funciona neste tablet. */
+@Composable
+private fun TelaTreino(passo: String, onVoltar: () -> Unit) {
+    var feito by remember { mutableStateOf(false) }
+
+    Pagina(centralizar = true) {
+        if (feito) {
+            Text("Missão cumprida.", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Cor.Verde)
+            Espaco(18)
+            BotaoPrincipal("Voltar aos ajustes", onClick = onVoltar)
+        } else {
+            Text("TREINO", color = Cor.Lilas, fontSize = 14.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Espaco(10)
+            if (passo == PASSO_VOZ) {
+                MissaoVoz(Repo.config.affirmation, onConcluir = { feito = true })
+            } else {
+                MissaoMemoria(onConcluir = { feito = true })
+            }
+            Espaco(22)
+            BotaoSecundario("Voltar", onClick = onVoltar)
+        }
     }
 }
 

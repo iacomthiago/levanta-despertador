@@ -14,3 +14,4 @@ local.properties
 
 # Saída do teste automático
 ci-out/
+__pycache__/

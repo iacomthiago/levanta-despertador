@@ -116,6 +116,10 @@ fun Preparacao() {
         respostas++
         if (!ok) abrirAjusteDeNotificacoes(context)
     }
+    val pedirMicrofone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        respostas++
+        if (!ok) abrirAjuste(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+    }
 
     // Ler os contadores faz esta função refazer as checagens quando eles mudam.
     @Suppress("UNUSED_VARIABLE")
@@ -159,6 +163,13 @@ fun Preparacao() {
                 "Recomendado: faz o alarme abrir sozinho mesmo se você estiver usando o tablet.",
                 false,
             ) { abrirAjuste(context, Settings.ACTION_MANAGE_OVERLAY_PERMISSION) }
+        )
+        if (Repo.config.surpriseEnabled && !microfoneLiberado(context)) add(
+            Pendencia(
+                "Liberar o microfone",
+                "Opcional: deixa o tablet ouvir sua afirmação na missão surpresa.",
+                false,
+            ) { pedirMicrofone.launch(Manifest.permission.RECORD_AUDIO) }
         )
     }
 

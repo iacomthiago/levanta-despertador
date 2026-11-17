@@ -2,11 +2,16 @@
 """Teste de ponta a ponta num emulador Android (roda no GitHub Actions).
 
 Instala o APK, dispara o alarme de teste com a tela apagada e cumpre o ciclo
-inteiro: contas -> frase -> espera -> checagem -> bom dia. Salva capturas de
-tela em ci-out/ e falha se o app travar ou alguma etapa não aparecer.
+inteiro: questões -> contas -> frase -> espera -> checagem -> bom dia. Depois
+confere a recaída e a troca da música pelo bipe. Salva capturas de tela em
+ci-out/ e falha se o app travar ou alguma etapa não aparecer.
+
+A missão surpresa (falar ou memória) fica desligada aqui: o emulador não fala
+nem enxerga a sequência que acende.
 
 Uso: python3 ci/smoke.py caminho/para/levanta.apk
 """
+import json
 import os
 import re
 import subprocess
@@ -17,6 +22,8 @@ import xml.etree.ElementTree as ET
 PKG = "com.iacomthiago.levanta"
 OUT = "ci-out"
 FRASE = "Eu levanto agora e cumpro o que prometi".split()
+with open("app/src/main/assets/questoes.json", encoding="utf-8") as _f:
+    QUESTOES = json.load(_f)
 
 problemas = []
 
@@ -120,9 +127,27 @@ def resolver_conta(texto):
 def cumprir_missoes(prefixo):
     """Resolve as contas e monta a frase até a tela de espera aparecer."""
     capturou_conta = False
-    for _ in range(30):
+    capturou_questao = False
+    for _ in range(70):
         nos = dump()
         ts = textos(nos)
+        continuar = achar(nos, "Continuar")
+        if continuar:
+            tocar(continuar)
+            time.sleep(1.0)
+            continue
+        questao = next((q for q in QUESTOES if q["texto"] in ts), None)
+        if questao:
+            if not capturou_questao:
+                shot(f"{prefixo}-questoes")
+                capturou_questao = True
+            rotulo = "Certo" if questao["certo"] else "Errado"
+            botao = achar(nos, rotulo)
+            if botao:
+                log(f"questão {questao['id']}: {rotulo}")
+                tocar(botao)
+            time.sleep(1.0)
+            continue
         conta = next((t for t in ts if re.fullmatch(r"\d+ [+×] \d+( \+ \d+)?", t)), None)
         if conta:
             if not capturou_conta:
@@ -152,7 +177,7 @@ def cumprir_missoes(prefixo):
         if "Não volte para a cama." in ts or "Você levantou." in ts:
             return True
         time.sleep(1)
-    problemas.append("As missões não terminaram em 30 passos")
+    problemas.append(f"As missões não terminaram em 70 passos. Na tela: {textos(dump())}")
     return False
 
 
@@ -167,7 +192,7 @@ def main():
     sh("input keyevent 224")  # acorda a tela
     sh("wm dismiss-keyguard")
 
-    log(sh(f"am start -W -n {PKG}/.MainActivity").strip())
+    log(sh(f"am start -W -n {PKG}/.MainActivity --ez sem_surpresa true").strip())
     time.sleep(5)
     shot("01-inicio")
     log("tela inicial: " + str(textos(dump())))
@@ -209,6 +234,8 @@ def main():
         time.sleep(2)
     if "started" not in som:
         problemas.append(f"Não há som de alarme tocando: {som!r}")
+    elif "CONTENT_TYPE_MUSIC" not in som:
+        problemas.append(f"O alarme não começou pela música de abertura: {som!r}")
 
     if not tocar_em("Começar missão"):
         return
@@ -246,6 +273,30 @@ def main():
                 tocar_em("Estou de pé")
                 if esperar("Você levantou.", 20):
                     shot("12-bom-dia-com-recaida")
+
+    # Terceira rodada: sem missão cumprida, a música tem que virar bipe em 60 s.
+    tocar_em("Fechar", 10)
+    sh(f"am start -n {PKG}/.MainActivity")
+    time.sleep(3)
+    if not tocar_em("Testar agora (toca em 5 segundos)"):
+        return
+    time.sleep(14)
+    tocando = "dumpsys audio | grep -i 'USAGE_ALARM' | grep -i 'state:started' | head -3"
+    som = sh(tocando).strip()
+    log(f"áudio no começo: {som}")
+    if "CONTENT_TYPE_MUSIC" not in som:
+        problemas.append(f"A terceira rodada não começou pela música: {som!r}")
+    log("esperando a música virar bipe (60 s depois do toque)")
+    time.sleep(60)
+    som = sh(tocando).strip()
+    log(f"áudio depois de 60 s: {som}")
+    if "CONTENT_TYPE_SONIFICATION" not in som:
+        problemas.append(f"A música não virou bipe depois de 60 s: {som!r}")
+    shot("13-bipe")
+    if tocar_em("Começar missão", 20) and cumprir_missoes("14"):
+        if esperar("Você continua de pé?", 50):
+            tocar_em("Estou de pé")
+            esperar("Você levantou.", 20)
 
 
 if __name__ == "__main__":

@@ -56,6 +56,7 @@ class AlarmService : Service() {
         private const val SOUND_NONE = 0
         private const val SOUND_ALARM = 1
         private const val SOUND_CHIME = 2
+        private const val SOUND_MUSIC = 3
 
         fun send(context: Context, action: String, extras: Intent.() -> Unit = {}) {
             val intent = Intent(context, AlarmService::class.java).setAction(action).apply(extras)
@@ -242,6 +243,8 @@ class AlarmService : Service() {
                     applyPhase(showUi = false, phaseChanged = true)
                     return
                 }
+                // Acabou o tempo da música: entra o bipe, sem trégua de estilo.
+                startSound(loudSound(s, now))
                 keepLoud(s, now)
             }
 
@@ -266,7 +269,7 @@ class AlarmService : Service() {
         val s = Repo.session
         when (s?.phase) {
             Phase.RINGING, Phase.RELAPSE -> {
-                startSound(SOUND_ALARM)
+                startSound(loudSound(s ?: return))
                 startTicker()
                 if (phaseChanged) refreshNotification()
                 if (showUi) launchUi()
@@ -302,22 +305,39 @@ class AlarmService : Service() {
             }
         }
         try {
-            val afd = resources.openRawResourceFd(if (kind == SOUND_ALARM) R.raw.alarm else R.raw.chime)
+            val recurso = when (kind) {
+                SOUND_MUSIC -> R.raw.abertura
+                SOUND_ALARM -> R.raw.alarm
+                else -> R.raw.chime
+            }
+            val afd = resources.openRawResourceFd(recurso)
             val p = MediaPlayer()
             p.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(AudioAttributes.USAGE_ALARM)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setContentType(
+                        if (kind == SOUND_MUSIC) AudioAttributes.CONTENT_TYPE_MUSIC
+                        else AudioAttributes.CONTENT_TYPE_SONIFICATION
+                    )
                     .build()
             )
             p.setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
             afd.close()
             p.isLooping = true
             p.prepare()
-            if (kind == SOUND_ALARM && Repo.config.gradualVolume) p.setVolume(0.15f, 0.15f)
+            val sessao = Repo.session
+            if (kind != SOUND_CHIME && sessao != null) {
+                val v = loudVolume(sessao, System.currentTimeMillis())
+                p.setVolume(v, v)
+            }
             p.start()
             player = p
             currentSound = kind
+            Log.i(TAG, "som=" + when (kind) {
+                SOUND_MUSIC -> "musica"
+                SOUND_ALARM -> "bipe"
+                else -> "checagem"
+            })
         } catch (e: Exception) {
             Log.e(TAG, "Falha ao tocar o som", e)
         }
@@ -325,16 +345,33 @@ class AlarmService : Service() {
         if (kind == SOUND_ALARM) startVibration() else stopVibration()
     }
 
-    private fun keepLoud(s: Session, now: Long) {
-        // Se alguém baixou o volume do aparelho, ele volta ao máximo.
-        setStreamVolume(1f)
+    /** Música da abertura primeiro; passado o prazo, ou numa recaída, o bipe. */
+    private fun loudSound(s: Session, now: Long = System.currentTimeMillis()): Int {
+        val c = Repo.config
+        val naMusica = c.musicFirst && s.phase == Phase.RINGING &&
+            now - s.phaseSince < c.musicSeconds.coerceIn(15, 600) * 1000L
+        return if (naMusica) SOUND_MUSIC else SOUND_ALARM
+    }
+
+    private fun loudVolume(s: Session, now: Long): Float {
         val ramp = if (Repo.config.gradualVolume && s.phase == Phase.RINGING) {
             (0.15f + 0.85f * ((now - s.phaseSince) / 45_000f)).coerceIn(0.15f, 1f)
         } else {
             1f
         }
-        // Trégua: enquanto a pessoa está resolvendo a missão o som fica baixo.
-        val volume = if (now < Repo.quietUntil) 0.07f else ramp
+        return when {
+            // Silêncio curto para o microfone ouvir a afirmação.
+            now < Repo.silenceUntil -> 0f
+            // Trégua: enquanto a pessoa está resolvendo a missão o som fica baixo.
+            now < Repo.quietUntil -> 0.07f
+            else -> ramp
+        }
+    }
+
+    private fun keepLoud(s: Session, now: Long) {
+        // Se alguém baixou o volume do aparelho, ele volta ao máximo.
+        setStreamVolume(1f)
+        val volume = loudVolume(s, now)
         try {
             player?.setVolume(volume, volume)
         } catch (e: Exception) {
