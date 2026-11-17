@@ -98,7 +98,7 @@ fun FluxoDeMissoes(onConcluir: () -> Unit) {
     Pagina(centralizar = true) {
         Text(
             "MISSÃO ${indice + 1} DE ${passos.size}",
-            color = Cor.Ambar,
+            color = Cor.Lilas,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.5.sp,
@@ -164,7 +164,7 @@ fun MissaoContas(quantidade: Int, nivel: Int, onConcluir: () -> Unit) {
         "= " + entrada.ifEmpty { "?" },
         fontSize = 40.sp,
         fontWeight = FontWeight.SemiBold,
-        color = if (erro) Cor.Vermelho else Cor.Ambar,
+        color = if (erro) Cor.Vermelho else Cor.Lilas,
     )
     Text(
         if (erro) "Resposta errada. Tente de novo." else " ",
@@ -229,8 +229,8 @@ private fun Teclado(onDigito: (String) -> Unit, onApagar: () -> Unit, onOk: () -
                         shape = RoundedCornerShape(16.dp),
                         contentPadding = PaddingValues(0.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (ok) Cor.Ambar else Cor.CartaoAlto,
-                            contentColor = if (ok) Cor.SobreAmbar else Cor.Texto,
+                            containerColor = if (ok) Cor.Roxo else Cor.CartaoAlto,
+                            contentColor = if (ok) Cor.SobreRoxo else Cor.Texto,
                         ),
                     ) {
                         Text(

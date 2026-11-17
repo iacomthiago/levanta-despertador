@@ -40,28 +40,37 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+// Paleta do site iacomthiago.com.br: roxo da marca sobre fundo quase preto.
 object Cor {
-    val Fundo = Color(0xFF0E1420)
-    val Cartao = Color(0xFF18202F)
-    val CartaoAlto = Color(0xFF222C3F)
-    val Ambar = Color(0xFFFFB547)
-    val SobreAmbar = Color(0xFF2A1A00)
-    val Verde = Color(0xFF6FD6C0)
-    val Vermelho = Color(0xFFFF6B6B)
-    val Texto = Color(0xFFE8ECF4)
-    val Suave = Color(0xFF9AA6BC)
-    val Linha = Color(0xFF34405A)
+    val Fundo = Color(0xFF08070D)
+    val Cartao = Color(0xFF15121F)
+    val CartaoAlto = Color(0xFF1F1A2E)
+    /** Roxo da marca: fundo dos botões principais. Como texto fica escuro demais; use [Lilas]. */
+    val Roxo = Color(0xFF5D03F3)
+    val SobreRoxo = Color(0xFFFFFFFF)
+    /** Roxo claro para textos de destaque, chaves e contornos ativos. */
+    val Lilas = Color(0xFFA77BFF)
+    val SobreLilas = Color(0xFF1A0B3D)
+    /** Dourado do site: avisos e pontos de atenção. */
+    val Ouro = Color(0xFFF6C768)
+    val Verde = Color(0xFF7EE0A1)
+    val Vermelho = Color(0xFFFF7A7A)
+    val Texto = Color(0xFFECEBF1)
+    val Suave = Color(0xFFA09DB3)
+    val Linha = Color(0xFF2A2540)
 }
 
 private val Esquema = darkColorScheme(
-    primary = Cor.Ambar,
-    onPrimary = Cor.SobreAmbar,
-    primaryContainer = Color(0xFF4A3410),
-    onPrimaryContainer = Color(0xFFFFDDA8),
-    secondary = Cor.Verde,
-    onSecondary = Color(0xFF00382E),
-    secondaryContainer = Color(0xFF1D4A42),
-    onSecondaryContainer = Color(0xFFB6F2E4),
+    primary = Cor.Lilas,
+    onPrimary = Cor.SobreLilas,
+    primaryContainer = Color(0xFF34128A),
+    onPrimaryContainer = Color(0xFFE6DAFF),
+    secondary = Cor.Lilas,
+    onSecondary = Cor.SobreLilas,
+    secondaryContainer = Color(0xFF34128A),
+    onSecondaryContainer = Color(0xFFE6DAFF),
+    tertiary = Cor.Ouro,
+    onTertiary = Color(0xFF3A2A00),
     background = Cor.Fundo,
     onBackground = Cor.Texto,
     surface = Cor.Cartao,
@@ -153,7 +162,7 @@ fun BotaoPrincipal(
         enabled = habilitado,
         modifier = modifier.fillMaxWidth().heightIn(min = 58.dp),
         shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Cor.Ambar, contentColor = Cor.SobreAmbar),
+        colors = ButtonDefaults.buttonColors(containerColor = Cor.Roxo, contentColor = Cor.SobreRoxo),
     ) {
         Text(texto, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }

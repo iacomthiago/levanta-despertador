@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="fundo">#0E1420</color>
-    <color name="icone_fundo">#141C2C</color>
+    <color name="fundo">#08070D</color>
+    <color name="icone_fundo">#5D03F3</color>
 
     <style name="Theme.Levanta" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/fundo</item>
         <item name="android:statusBarColor">@color/fundo</item>
         <item name="android:navigationBarColor">@color/fundo</item>
-        <item name="android:colorAccent">#FFB547</item>
+        <item name="android:colorAccent">#A77BFF</item>
     </style>
 </resources>

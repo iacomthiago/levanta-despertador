@@ -166,12 +166,12 @@ fun Preparacao() {
 
     val faltaObrigatoria = pendencias.any { it.obrigatoria }
     Espaco(14)
-    Cartao(cor = if (faltaObrigatoria) androidx.compose.ui.graphics.Color(0xFF3A2A12) else Cor.Cartao) {
+    Cartao(cor = if (faltaObrigatoria) androidx.compose.ui.graphics.Color(0xFF2A2213) else Cor.Cartao) {
         Text(
             if (faltaObrigatoria) "Antes de confiar no alarme" else "Ajuste recomendado",
             fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
-            color = if (faltaObrigatoria) Cor.Ambar else Cor.Texto,
+            color = if (faltaObrigatoria) Cor.Ouro else Cor.Texto,
         )
         if (faltaObrigatoria) {
             Text(
@@ -194,8 +194,8 @@ fun Preparacao() {
                     onClick = p.acao,
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (p.obrigatoria) Cor.Ambar else Cor.CartaoAlto,
-                        contentColor = if (p.obrigatoria) Cor.SobreAmbar else Cor.Texto,
+                        containerColor = if (p.obrigatoria) Cor.Roxo else Cor.CartaoAlto,
+                        contentColor = if (p.obrigatoria) Cor.SobreRoxo else Cor.Texto,
                     ),
                 ) {
                     Text("Liberar", fontWeight = FontWeight.SemiBold)

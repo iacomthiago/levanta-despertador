@@ -183,7 +183,7 @@ private fun TelaTocando(sessao: Session, agora: Long, onComecar: () -> Unit, onS
     Pagina(centralizar = true) {
         Text(
             if (recaida) "VOCÊ NÃO CONFIRMOU" else "HORA DE LEVANTAR",
-            color = if (recaida) Cor.Vermelho else Cor.Ambar,
+            color = if (recaida) Cor.Vermelho else Cor.Lilas,
             fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
             letterSpacing = 2.sp,
@@ -244,11 +244,11 @@ private fun TelaEspera(sessao: Session, agora: Long, onFechar: () -> Unit) {
 @Composable
 private fun TelaChecagem(sessao: Session, agora: Long, onConfirmar: () -> Unit) {
     Pagina(centralizar = true) {
-        Text("CHECAGEM", color = Cor.Ambar, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Text("CHECAGEM", color = Cor.Lilas, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
         Espaco(8)
         Text("Você continua de pé?", fontSize = 34.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         Espaco(16)
-        Contagem(sessao.nextEventAt - agora, Cor.Ambar)
+        Contagem(sessao.nextEventAt - agora, Cor.Lilas)
         Text(
             "Confirme antes do tempo acabar ou o alarme volta com a missão inteira.",
             fontSize = 16.sp,
@@ -320,7 +320,7 @@ private fun TelaFim(
                 Text(
                     if (seguidos == 1) "Sequência: 1 despertar" else "Sequência: $seguidos despertares",
                     fontSize = 18.sp,
-                    color = Cor.Ambar,
+                    color = Cor.Lilas,
                     fontWeight = FontWeight.SemiBold,
                 )
             }

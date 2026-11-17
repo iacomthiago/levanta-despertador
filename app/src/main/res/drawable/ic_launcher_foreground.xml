@@ -8,25 +8,25 @@
 
     <!-- Meio sol -->
     <path
-        android:fillColor="#FFB547"
+        android:fillColor="#F6C768"
         android:pathData="M38,62 A16,16 0 0 1 70,62 Z" />
 
     <!-- Raios -->
     <path
         android:pathData="M54,32 L54,39 M33,41 L38,46 M75,41 L70,46 M26,58 L32,58 M82,58 L76,58"
-        android:strokeColor="#FFB547"
+        android:strokeColor="#F6C768"
         android:strokeLineCap="round"
         android:strokeWidth="4" />
 
     <!-- Horizonte -->
     <path
         android:pathData="M29,67 L79,67"
-        android:strokeColor="#E8ECF4"
+        android:strokeColor="#FFFFFF"
         android:strokeLineCap="round"
         android:strokeWidth="4" />
     <path
         android:pathData="M40,75 L68,75"
-        android:strokeColor="#6FD6C0"
+        android:strokeColor="#C9B0FF"
         android:strokeLineCap="round"
         android:strokeWidth="4" />
 </vector>

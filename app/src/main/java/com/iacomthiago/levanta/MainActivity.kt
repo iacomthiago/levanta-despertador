@@ -150,7 +150,7 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
         Cartao(cor = Cor.CartaoAlto) {
             Text("PRÓXIMO ALARME", color = Cor.Suave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
             if (proximo != null) {
-                Text(hhmm(proximo.second), fontSize = 60.sp, fontWeight = FontWeight.Bold, color = Cor.Ambar, lineHeight = 66.sp)
+                Text(hhmm(proximo.second), fontSize = 60.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas, lineHeight = 66.sp)
                 Text("${diaCurto(proximo.second)} · ${daquiA(proximo.second)}", fontSize = 16.sp, color = Cor.Texto)
             } else {
                 Espaco(6)
@@ -493,7 +493,7 @@ private fun TelaHistorico(onVoltar: () -> Unit) {
                     Spacer(Modifier.width(10.dp))
                     if (ok) {
                         val minutos = ((item.upAt - item.startedAt).coerceAtLeast(0L) / 60_000L).toInt()
-                        Text("$minutos min", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if (item.relapses > 0) Cor.Ambar else Cor.Verde)
+                        Text("$minutos min", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = if (item.relapses > 0) Cor.Ouro else Cor.Verde)
                     } else {
                         Text("Sem resposta", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Cor.Vermelho)
                     }
