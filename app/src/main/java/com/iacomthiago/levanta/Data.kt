@@ -12,6 +12,7 @@ import org.json.JSONObject
 const val DEFAULT_PHRASE = "Eu levanto agora e cumpro o que prometi"
 const val DEFAULT_AFFIRMATION = "Eu vou conseguir. Eu vou ser aprovado."
 const val DEFAULT_EXAM_DATE = "13/12/2026"
+const val DEFAULT_ENCOURAGEMENT = "Thiago, você vai conseguir. Você vai ser aprovado. Eu acredito em você."
 
 class App : Application() {
     override fun onCreate() {
@@ -51,6 +52,8 @@ data class Config(
     /** Missão extra sorteada a cada despertar (falar a afirmação ou memória). */
     val surpriseEnabled: Boolean = true,
     val affirmation: String = DEFAULT_AFFIRMATION,
+    /** O que o app responde em voz alta depois de ouvir a afirmação; vazio desliga a resposta. */
+    val encouragement: String = DEFAULT_ENCOURAGEMENT,
     /** Começa com a música; depois de [musicSeconds] sem missão cumprida, vira o bipe. */
     val musicFirst: Boolean = true,
     val musicSeconds: Int = 60,
@@ -246,6 +249,7 @@ object Repo {
             .put("quizCount", value.quizCount)
             .put("surpriseEnabled", value.surpriseEnabled)
             .put("affirmation", value.affirmation)
+            .put("encouragement", value.encouragement)
             .put("musicFirst", value.musicFirst)
             .put("musicSeconds", value.musicSeconds)
             .put("examDate", value.examDate)
@@ -275,6 +279,7 @@ object Repo {
                 quizCount = o.optInt("quizCount", d.quizCount),
                 surpriseEnabled = o.optBoolean("surpriseEnabled", d.surpriseEnabled),
                 affirmation = o.optString("affirmation", d.affirmation),
+                encouragement = o.optString("encouragement", d.encouragement),
                 musicFirst = o.optBoolean("musicFirst", d.musicFirst),
                 musicSeconds = o.optInt("musicSeconds", d.musicSeconds),
                 examDate = o.optString("examDate", d.examDate),

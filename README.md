@@ -12,7 +12,7 @@ Feito para ficar num tablet **longe da cama**, no carregador.
    - **Questões do concurso:** afirmações de certo ou errado sobre Constituição e Licitações, até somar o número de acertos pedido. Errou, lê a explicação e responde outra. Primeiro aparecem as que você errou e as que ainda não viu.
    - **Contas:** resolver contas num teclado próprio na tela.
    - **Frase:** montar sua frase de compromisso tocando nas palavras na ordem certa.
-   - **Missão surpresa:** uma extra, sorteada a cada despertar. Ou falar sua afirmação em voz alta para o tablet ouvir, ou repetir uma sequência de quadros que acendem.
+   - **Missão surpresa:** uma extra, sorteada a cada despertar. Ou falar sua afirmação em voz alta para o tablet ouvir (e ele responde em voz alta com uma frase de apoio), ou repetir uma sequência de quadros que acendem.
 3. **Trégua.** Enquanto você está resolvendo, o som fica baixo. Parou de mexer por 30 segundos, o volume volta. O teto é de 3 minutos por missão.
 4. **Checagem.** Minutos depois, o tablet pergunta "você continua de pé?". Sem resposta em 45 segundos, é recaída: o alarme volta e a missão recomeça.
 5. **Fim.** Passou pela checagem, o despertar entra no histórico, a tela de bom dia mostra quantos dias faltam para a prova e, se você quiser, o app do Claude abre em seguida.

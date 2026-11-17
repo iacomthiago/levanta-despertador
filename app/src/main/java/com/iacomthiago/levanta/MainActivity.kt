@@ -452,6 +452,19 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Espaco(8)
+                OutlinedTextField(
+                    value = c.encouragement,
+                    onValueChange = { Repo.updateConfig(c.copy(encouragement = it.take(160))) },
+                    label = { Text("O que o tablet responde em voz alta") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text(
+                    "Depois de ouvir a sua afirmação, o tablet diz esta frase. Deixe vazio para ele não falar.",
+                    fontSize = 13.sp,
+                    color = Cor.Suave,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Espaco(8)
                 if (!microfone) {
                     Text(
                         "Para o tablet ouvir a afirmação, libere o microfone. Sem isso, a surpresa é sempre a de memória.",

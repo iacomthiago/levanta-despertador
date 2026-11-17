@@ -4,10 +4,15 @@ import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -670,7 +675,8 @@ fun falaConfere(frase: String, fala: String): Boolean {
 /**
  * A pessoa diz a afirmação em voz alta e o tablet confere. Enquanto ouve, o
  * alarme fica mudo por alguns segundos. Se o reconhecimento de voz falhar,
- * a saída é montar a mesma frase tocando nas palavras.
+ * a saída é montar a mesma frase tocando nas palavras. No fim, o tablet
+ * responde em voz alta com uma frase de apoio.
  */
 @Composable
 fun MissaoVoz(frase: String, onConcluir: () -> Unit) {
@@ -682,6 +688,89 @@ fun MissaoVoz(frase: String, onConcluir: () -> Unit) {
     var aviso by remember { mutableStateOf(" ") }
     var trocar by remember { mutableStateOf(false) }
     var pronto by remember { mutableStateOf(false) }
+
+    // ----- resposta em voz alta -----
+    val apoio = remember { Repo.config.encouragement.trim() }
+    val principal = remember { Handler(Looper.getMainLooper()) }
+    val voz = remember { arrayOfNulls<TextToSpeech>(1) }
+    val encerrado = remember { booleanArrayOf(false) }
+    var vozPronta by remember { mutableStateOf(false) }
+    var falando by remember { mutableStateOf(false) }
+
+    val terminar: () -> Unit = {
+        if (!encerrado[0]) {
+            encerrado[0] = true
+            Repo.silenceUntil = 0L
+            concluir()
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val tts = try {
+            TextToSpeech(context.applicationContext) { status -> vozPronta = status == TextToSpeech.SUCCESS }
+        } catch (e: Exception) {
+            null
+        }
+        voz[0] = tts
+        onDispose {
+            try {
+                tts?.stop()
+                tts?.shutdown()
+            } catch (e: Exception) {
+                // nada a fazer
+            }
+        }
+    }
+
+    /** Missão cumprida: o tablet diz a frase de apoio e só então segue adiante. */
+    val apoiar: () -> Unit = {
+        val tts = voz[0]
+        if (apoio.isEmpty() || tts == null || !vozPronta) {
+            terminar()
+        } else {
+            falando = true
+            // O alarme fica mudo enquanto a frase é dita.
+            Repo.silenceUntil = System.currentTimeMillis() + 12_000L
+            try {
+                tts.setLanguage(Locale("pt", "BR"))
+                tts.setSpeechRate(0.95f)
+                // Sai pelo canal de alarme, que está no volume máximo enquanto o alarme toca.
+                tts.setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .build()
+                )
+                tts.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+
+                    override fun onDone(utteranceId: String?) {
+                        principal.post { terminar() }
+                    }
+
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) {
+                        principal.post { terminar() }
+                    }
+
+                    override fun onError(utteranceId: String?, errorCode: Int) {
+                        principal.post { terminar() }
+                    }
+                })
+                if (tts.speak(apoio, TextToSpeech.QUEUE_FLUSH, null, "apoio") != TextToSpeech.SUCCESS) terminar()
+            } catch (e: Exception) {
+                terminar()
+            }
+        }
+    }
+
+    // Se a voz do tablet travar, a missão não fica presa: segue em 12 segundos.
+    LaunchedEffect(falando) {
+        if (falando) {
+            delay(12_000L)
+            terminar()
+        }
+    }
 
     val reconhecedor = remember {
         try {
@@ -731,7 +820,7 @@ fun MissaoVoz(frase: String, onConcluir: () -> Unit) {
                 if (ouvidas.any { falaConfere(frase, it) }) {
                     if (!pronto) {
                         pronto = true
-                        concluir()
+                        apoiar()
                     }
                 } else {
                     falhas += 1
@@ -769,8 +858,24 @@ fun MissaoVoz(frase: String, onConcluir: () -> Unit) {
         }
     }
 
+    if (falando) {
+        Text("Agora ouça", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Cor.Verde, textAlign = TextAlign.Center)
+        Espaco(18)
+        Cartao {
+            Text(
+                apoio,
+                fontSize = 26.sp,
+                lineHeight = 34.sp,
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        return
+    }
+
     if (trocar) {
-        if (palavrasDaFrase(frase).size >= 3) MissaoFrase(frase, onConcluir) else MissaoContas(3, 1, onConcluir)
+        if (palavrasDaFrase(frase).size >= 3) MissaoFrase(frase, apoiar) else MissaoContas(3, 1, apoiar)
         return
     }
 
