@@ -105,8 +105,10 @@ data class Config(
     val sleepMinutes: Int = 480,
     /** Fechar todas as metas de estudo antes desta hora dá bônus. */
     val studyBonusHour: Int = 14,
-    /** Mínimo de palavras no resumo que conclui uma meta de estudo. */
+    /** Sobrou da versão com metas escritas; nada mais usa. */
     val minWords: Int = 20,
+    /** Quantos blocos de 30 minutos de estudo fecham a missão de estudo do dia. */
+    val studyBlocks: Int = 4,
     /** Avisa no começo da noite se ainda há missão que conta para a sequência. */
     val streakWarning: Boolean = true,
 )
@@ -330,6 +332,7 @@ object Repo {
             .put("sleepMinutes", value.sleepMinutes)
             .put("studyBonusHour", value.studyBonusHour)
             .put("minWords", value.minWords)
+            .put("studyBlocks", value.studyBlocks)
             .put("streakWarning", value.streakWarning)
         prefs.edit().putString("config", o.toString()).apply()
     }
@@ -365,6 +368,7 @@ object Repo {
                 sleepMinutes = o.optInt("sleepMinutes", d.sleepMinutes),
                 studyBonusHour = o.optInt("studyBonusHour", d.studyBonusHour),
                 minWords = o.optInt("minWords", d.minWords),
+                studyBlocks = o.optInt("studyBlocks", d.studyBlocks),
                 streakWarning = o.optBoolean("streakWarning", d.streakWarning),
             )
         } catch (e: Exception) {

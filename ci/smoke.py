@@ -4,7 +4,7 @@
 Instala o APK, dispara o alarme de teste com a tela apagada e cumpre o ciclo
 inteiro: questões -> contas -> frase -> espera -> checagem -> bom dia. Depois
 confere a recaída e a troca da música pelo bipe. Em seguida usa as telas do
-Disciplina: metas de estudo com resumo digitado, diário, missão simples com o
+Disciplina: estudo em blocos de 30 minutos (marca, desmarca), missão simples com o
 alarme que para com um toque, treino, ideias e a experiência somada. Por fim,
 os avisos de hora de dormir. Salva capturas de tela em ci-out/ e falha se o
 app travar ou alguma etapa não aparecer.
@@ -316,70 +316,60 @@ def voltar_para_o_app():
     time.sleep(3)
 
 
-def escrever_resumo():
-    """Digita o resumo aos poucos, até passar do mínimo de palavras.
-
-    O emulador engole teclas quando o texto vem comprido de uma vez só, então
-    quem diz quando parar é o próprio campo (o contador da tela pode estar
-    escondido atrás do teclado).
-    """
-    for _ in range(16):
-        campos = [n for n in dump() if n["cls"].endswith("EditText")]
-        if campos and len(campos[-1]["text"].split()) >= 24:
+def tocar_bloco(numero, marcado=False):
+    """Toca num bloco de estudo: num livre para marcar, ou num já marcado para desmarcar."""
+    descricao = f"Bloco {numero} feito" if marcado else f"Bloco {numero}"
+    rotulo = "Feito" if marcado else "30 min"
+    nos = []
+    for _ in range(5):
+        nos = dump()
+        no = achar(nos, descricao)
+        if not no:
+            # Sem a descrição, serve qualquer bloco no estado certo (o primeiro da tela).
+            candidatos = [n for n in nos if n["text"] == rotulo and n["enabled"]]
+            no = candidatos[0] if candidatos else None
+        if no:
+            tocar(no)
+            time.sleep(1.2)
             return True
-        digitar("estudei o artigo e entendi ")
-        time.sleep(1.0)
-    problemas.append(f"O resumo não chegou ao mínimo de palavras. Na tela: {textos(dump())}")
+        rolar(nos)
+    problemas.append(f"Não achei o bloco de estudo {descricao!r}. Na tela: {textos(nos)}")
     log(problemas[-1])
     return False
 
 
 def estudar():
-    """Escreve duas metas e conclui cada uma com um resumo digitado (o emulador não fala)."""
-    if not tocar_rolando("Escreva as metas de hoje", contendo=True):
+    """Marca blocos de 30 minutos até bater a meta do dia, desmarca um e marca de novo."""
+    if not tocar_rolando("Marque os blocos de 30 minutos", contendo=True):
         return False
-    if not esperar("Nenhuma ainda", 15):
+    if not esperar("Nenhum bloco ainda", 15):
+        return False
+    if not esperar("0 de 4 blocos para o dia contar", 10):
         return False
     shot("15-estudo-vazio")
-    if not tocar_campo():
-        return False
-    digitar("Ler artigo 37")
-    sh("input keyevent 66")
-    digitar("Resolver dez questoes")
-    fechar_teclado()
-    if not tocar_rolando("Adicionar metas"):
-        return False
-    if not esperar("0 de 2", 15):
-        return False
-    shot("16-estudo-metas")
 
-    for feitas in (1, 2):
-        if not tocar_rolando("Concluir meta"):
+    for numero in (1, 2, 3, 4):
+        if not tocar_bloco(numero):
             return False
-        if not esperar("META", 15):
+        if not procurar(f"{numero} de 4 blocos para o dia contar"):
             return False
-        if not tocar_campo():
-            return False
-        if not escrever_resumo():
-            return False
-        fechar_teclado()
-        if feitas == 1:
-            shot("17-resumo-da-meta")
-        if not tocar_rolando("Guardar e concluir (+30 XP)"):
-            return False
-        if not esperar(f"{feitas} de 2", 15):
-            return False
-    if not esperar("Dia de estudo fechado.", 10):
+        if numero == 1:
+            shot("16-estudo-um-bloco")
+    if not procurar("Meta de hoje batida", contendo=True):
+        return False
+    shot("17-estudo-meta-batida")
+
+    # Um toque por engano se desfaz: desmarcar tira o bloco e reabre a meta do dia.
+    if not tocar_bloco(4, marcado=True):
+        return False
+    if not procurar("3 de 4 blocos para o dia contar"):
+        return False
+    if not tocar_bloco(4):
+        return False
+    if not procurar("4 de 4 blocos para o dia contar"):
         return False
     shot("18-estudo-fechado")
 
-    if not tocar_rolando("Diário de estudo"):
-        return False
-    if not esperar("Copiar o diário inteiro", 15):
-        return False
-    shot("19-diario")
-    sh("input keyevent 4")  # volta para o estudo
-    time.sleep(1.5)
     sh("input keyevent 4")  # volta para a tela inicial
     time.sleep(1.5)
     return True
@@ -503,8 +493,8 @@ def conferir_disciplina():
 
     if not estudar():
         return False
-    # Duas metas de 30; fechadas antes das 14 h, mais 50 de bônus.
-    total = conferir_ganho(total, (110, 60), "o estudo")
+    # Quatro blocos de 25; meta do dia batida antes das 14 h, mais 50 de bônus.
+    total = conferir_ganho(total, (150, 100), "o estudo")
 
     if not missao_simples():
         return False

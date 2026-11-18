@@ -85,7 +85,7 @@ class AlarmActivity : ComponentActivity() {
     /**
      * Missões que não são a de levantar param com um toque. Com [abrir], o
      * toque já leva para a missão: conclui a simples, abre o treino no
-     * navegador ou mostra as metas de estudo.
+     * navegador ou mostra os blocos de estudo.
      */
     private fun atenderMissao(abrir: Boolean) {
         val sessao = Repo.session ?: return
@@ -348,11 +348,11 @@ private fun TelaMissaoTocando(sessao: Session, agora: Long, onMissao: (Boolean) 
         }
 
         Tipo.ESTUDO -> {
-            val metas = Jogo.metasDe(hojeTexto())
-            botao = "Abrir as metas de hoje"
+            val blocos = Jogo.blocosDe(hojeTexto()).size
+            botao = "Abrir os blocos de estudo"
             detalhe = when {
-                metas.isEmpty() -> "Escreva as metas de hoje e comece pela primeira."
-                else -> "${metas.count { it.feitaEm != 0L }} de ${metas.size} metas concluídas."
+                blocos == 0 -> "A cada $MINUTOS_DO_BLOCO minutos de estudo, marque um bloco."
+                else -> "$blocos de ${Jogo.metaDeBlocos()} blocos marcados hoje."
             }
         }
 

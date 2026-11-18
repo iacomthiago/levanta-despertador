@@ -19,12 +19,28 @@ import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
-/** Quanto vale cada coisa. Estudo é o que mais rende: cada meta conta, e fechar o dia cedo dá bônus. */
+/** O estudo do dia é marcado em blocos: 14 blocos de 30 minutos dão 7 horas. */
+const val BLOCOS_POR_DIA = 14
+const val MINUTOS_DO_BLOCO = 30
+
+/** Tempo somado de [n] blocos, por extenso: "30 min", "1 h", "2 h 30 min". */
+fun tempoDeBlocos(n: Int): String {
+    val minutos = n * MINUTOS_DO_BLOCO
+    val h = minutos / 60
+    val m = minutos % 60
+    return when {
+        h == 0 -> "$m min"
+        m == 0 -> "$h h"
+        else -> "$h h $m min"
+    }
+}
+
+/** Quanto vale cada coisa. Estudo é o que mais rende: cada bloco conta, e bater a meta do dia cedo dá bônus. */
 object Xp {
     const val LEVANTAR = 30
     const val TREINO = 40
     const val SIMPLES = 10
-    const val META = 30
+    const val BLOCO = 25
     const val BONUS_ESTUDO = 50
     const val SEMANA = 150
 
@@ -65,7 +81,10 @@ fun indiceDoRank(nivel: Int): Int = RANKS.indexOfLast { nivel >= it.desde }.coer
 /** Uma missão concluída num dia ([dia] no formato aaaa-mm-dd). */
 data class Feito(val dia: String, val alarmId: Int, val tipo: String, val em: Long, val xp: Int)
 
-/** Uma meta de estudo. Depois de concluída, ela e o [resumo] formam o diário de estudo. */
+/**
+ * Uma meta de estudo escrita, do jeito antigo (antes dos blocos de 30 minutos).
+ * Não se criam mais; as concluídas continuam guardadas no diário.
+ */
 data class Meta(
     val id: Long,
     val dia: String,
@@ -88,7 +107,7 @@ fun hojeTexto(): String = LocalDate.now().toString()
 fun contarPalavras(texto: String): Int = texto.trim().split(Regex("\\s+")).count { it.isNotBlank() }
 
 /**
- * Progresso: experiência, nível, sequência de dias, metas de estudo e missão
+ * Progresso: experiência, nível, sequência de dias, blocos de estudo e missão
  * da semana. Fica no mesmo arquivo de preferências do resto do app, em chaves
  * próprias, então atualizar o app não apaga nada.
  */
@@ -104,6 +123,10 @@ object Jogo {
     var feitos by mutableStateOf(listOf<Feito>())
         private set
     var metas by mutableStateOf(listOf<Meta>())
+        private set
+
+    /** Blocos de estudo marcados em cada dia: dia (aaaa-mm-dd) para os números dos blocos. */
+    var blocos by mutableStateOf(mapOf<String, Set<Int>>())
         private set
     var ideias by mutableStateOf(listOf<Ideia>())
         private set
@@ -244,6 +267,19 @@ object Jogo {
         } catch (e: Exception) {
             emptyList()
         }
+        blocos = try {
+            val o = JSONObject(prefs.getString("blocos", "{}") ?: "{}")
+            val lidos = mutableMapOf<String, Set<Int>>()
+            for (dia in o.keys()) {
+                val arr = o.optJSONArray(dia)
+                if (arr != null) {
+                    lidos[dia] = (0 until arr.length()).map { arr.optInt(it) }.filter { it in 1..BLOCOS_POR_DIA }.toSet()
+                }
+            }
+            lidos
+        } catch (e: Exception) {
+            emptyMap()
+        }
         ideias = try {
             val arr = JSONArray(prefs.getString("ideias", "[]") ?: "[]")
             (0 until arr.length()).map { n ->
@@ -292,19 +328,10 @@ object Jogo {
         prefs.edit().putString("jogo", o.toString()).putString("feitos", arr.toString()).commit()
     }
 
-    private fun salvarMetas() {
-        val arr = JSONArray()
-        for (m in metas) {
-            arr.put(
-                JSONObject()
-                    .put("id", m.id)
-                    .put("dia", m.dia)
-                    .put("texto", m.texto)
-                    .put("feitaEm", m.feitaEm)
-                    .put("resumo", m.resumo)
-            )
-        }
-        prefs.edit().putString("metas", arr.toString()).commit()
+    private fun salvarBlocos() {
+        val o = JSONObject()
+        for ((dia, marcados) in blocos) o.put(dia, JSONArray(marcados.sorted()))
+        prefs.edit().putString("blocos", o.toString()).commit()
     }
 
     private fun salvarIdeias() {
@@ -331,6 +358,12 @@ object Jogo {
         } else {
             Ganho(valor, listOf(motivo), subiu, agora)
         }
+    }
+
+    /** Devolve experiência que tinha sido somada (um bloco desmarcado). */
+    private fun perder(valor: Int) {
+        xp = (xp - valor).coerceAtLeast(0)
+        ganho = null
     }
 
     private fun registrar(feito: Feito, motivo: String) {
@@ -452,78 +485,64 @@ object Jogo {
 
     // ---------- estudo ----------
 
-    fun metasDe(dia: String): List<Meta> = metas.filter { it.dia == dia }
+    /** Blocos de estudo marcados em [dia] (números de 1 a [BLOCOS_POR_DIA]). */
+    fun blocosDe(dia: String): Set<Int> = blocos[dia] ?: emptySet()
 
-    private val marcador = Regex("^(?:[-*•–]+\\s*|\\d+[.)]\\s+)")
+    /** Quantos blocos fecham a missão de estudo do dia. */
+    fun metaDeBlocos(): Int = Repo.config.studyBlocks.coerceIn(1, BLOCOS_POR_DIA)
 
-    /** Acrescenta uma meta por linha de [texto]; devolve quantas entraram. */
-    fun adicionarMetas(texto: String, dia: String): Int {
-        val linhas = texto.split('\n')
-            .map { it.trim().replace(marcador, "").trim() }
-            .filter { it.isNotEmpty() }
-            .take(30)
-        if (linhas.isEmpty()) return 0
-        val base = System.currentTimeMillis() * 100L
-        metas = metas + linhas.mapIndexed { n, linha -> Meta(base + n, dia, linha.take(240)) }
-        salvarMetas()
-        return linhas.size
-    }
-
-    fun excluirMeta(id: Long) {
-        metas = metas.filterNot { it.id == id && it.feitaEm == 0L }
-        salvarMetas()
-        conferirEstudo()
-    }
-
-    /** Metas de dias anteriores que ficaram sem concluir. */
-    fun atrasadas(): List<Meta> {
+    /**
+     * Marca ou desmarca um bloco de estudo de hoje. Marcar soma experiência;
+     * desmarcar (um toque por engano) devolve o que tinha sido somado.
+     */
+    fun alternarBloco(numero: Int) {
+        if (numero !in 1..BLOCOS_POR_DIA) return
         val hoje = hojeTexto()
-        return metas.filter { it.feitaEm == 0L && it.dia < hoje }
+        val marcados = blocosDe(hoje)
+        if (numero in marcados) {
+            blocos = blocos + (hoje to (marcados - numero))
+            salvarBlocos()
+            perder(Xp.BLOCO)
+            desfazerEstudoSeFaltar(hoje)
+            salvar()
+        } else {
+            val todos = blocos + (hoje to (marcados + numero))
+            // Guarda pouco mais de um ano; os dias mais antigos saem.
+            blocos = todos.keys.sorted().takeLast(400).associateWith { todos.getValue(it) }
+            salvarBlocos()
+            ganhar(Xp.BLOCO, "Bloco de estudo de $MINUTOS_DO_BLOCO minutos")
+            salvar()
+            conferirEstudo()
+        }
     }
 
-    fun trazerAtrasadasParaHoje() {
+    /** Blocos suficientes fecham a missão de estudo do dia; antes da hora combinada, com bônus. */
+    fun conferirEstudo() {
         val hoje = hojeTexto()
-        metas = metas.map { if (it.feitaEm == 0L && it.dia < hoje) it.copy(dia = hoje) else it }
-        salvarMetas()
-    }
-
-    fun descartarAtrasadas() {
-        val hoje = hojeTexto()
-        metas = metas.filterNot { it.feitaEm == 0L && it.dia < hoje }
-        salvarMetas()
-    }
-
-    /** Conclui a meta com o resumo falado ou digitado e guarda no diário. */
-    fun concluirMeta(id: Long, resumo: String): Boolean {
-        val meta = metas.firstOrNull { it.id == id } ?: return false
-        if (meta.feitaEm != 0L) return false
-        val agora = System.currentTimeMillis()
-        val hoje = hojeTexto()
-        metas = metas.map {
-            if (it.id == id) it.copy(feitaEm = agora, resumo = resumo.trim().take(4000), dia = hoje) else it
-        }.takeLast(3000)
-        salvarMetas()
-        ganhar(Xp.META, "Meta de estudo concluída")
-        salvar()
-        conferirEstudo()
-        return true
-    }
-
-    /** Todas as metas de hoje concluídas fecham a missão de estudo do dia; antes da hora combinada, com bônus. */
-    private fun conferirEstudo() {
-        val hoje = hojeTexto()
-        val lista = metasDe(hoje)
-        if (lista.isEmpty() || lista.any { it.feitaEm == 0L }) return
+        if (blocosDe(hoje).size < metaDeBlocos()) return
         if (feitos.any { it.dia == hoje && it.tipo == Tipo.ESTUDO }) return
         val limite = Repo.config.studyBonusHour.coerceIn(1, 23)
         val noPrazo = LocalTime.now().hour < limite
         registrar(
             Feito(hoje, ID_ESTUDO, Tipo.ESTUDO, System.currentTimeMillis(), if (noPrazo) Xp.BONUS_ESTUDO else 0),
-            if (noPrazo) "Todas as metas antes das $limite h" else "Todas as metas do dia fechadas",
+            if (noPrazo) "Meta de estudo batida antes das $limite h" else "Meta de estudo do dia batida",
         )
     }
 
-    /** O diário: metas concluídas, da mais recente para a mais antiga. */
+    /** Um bloco desmarcado pode deixar o dia abaixo da meta: aí o fechamento do dia (e o bônus) é desfeito. */
+    private fun desfazerEstudoSeFaltar(hoje: String) {
+        if (blocosDe(hoje).size >= metaDeBlocos()) return
+        val registro = feitos.firstOrNull { it.dia == hoje && it.tipo == Tipo.ESTUDO } ?: return
+        feitos = feitos - registro
+        perder(registro.xp)
+        val s = semana
+        if (s != null && s.premiada && progressoDaSemana(s) < s.alvo) {
+            semana = s.copy(premiada = false)
+            perder(Xp.SEMANA)
+        }
+    }
+
+    /** O diário antigo: metas escritas já concluídas, da mais recente para a mais antiga. */
     fun diario(): List<Meta> = metas.filter { it.feitaEm != 0L }.sortedByDescending { it.feitaEm }
 
     // ---------- treino ----------

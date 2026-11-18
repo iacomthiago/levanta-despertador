@@ -9,7 +9,7 @@ Feito para ficar num tablet **longe da cama**, no carregador.
 Ao criar uma missão você escolhe o tipo:
 
 - **Levantar:** o despertador. Toca e **só para com a missão cumprida** (detalhes abaixo). Vale 30 XP.
-- **Estudo:** uma lista de metas do dia, uma por linha (dá para colar várias e deixar prontas as de amanhã). Cada meta se conclui falando um parágrafo curto sobre o que foi estudado; o texto vai para o **diário de estudo**. O app conta as palavras (20 por padrão) e não julga o conteúdo. Se o reconhecimento de voz falhar, dá para digitar. Cada meta vale 30 XP, e fechar todas antes das 14 h dá mais 50.
+- **Estudo:** 14 blocos de 30 minutos (7 horas) para marcar com um toque: estudou meia hora, toca num bloco; tocar de novo desmarca. Não há nada para escrever. Cada bloco vale 25 XP. O dia de estudo conta para a sequência quando chega à meta de blocos (4 por padrão, ajustável), e bater a meta antes das 14 h dá mais 50 XP.
 - **Treino:** na hora, abre o treino no navegador. Na volta, o botão **Concluí** libera depois de uma parte da duração prevista (60% por padrão, ajustável em cada missão). Vale 40 XP.
 - **Simples:** tarefa rápida com nome livre, concluída com um toque. Vale 10 XP.
 
@@ -19,7 +19,7 @@ Os alarmes que não são o de levantar tocam forte, mas **param com um toque**, 
 
 - **Experiência e nível:** cada nível pede 50 XP a mais que o anterior. As faixas de nível têm o nome das marchas (Partida, Primeira marcha, Segunda marcha...) e mudam a cor da borda da imagem do personagem.
 - **Sequência de dias:** cada missão tem a opção **Conta para a sequência**. Um dia em que todas as marcadas foram concluídas soma um; uma marcada sem concluir até o fim do dia zera. Às 19 h o app avisa se ainda falta alguma.
-- **Missão da semana:** de segunda a domingo, um desafio (treinar em 5 dias, fechar as metas de estudo em 5 dias...) que vale 150 XP.
+- **Missão da semana:** de segunda a domingo, um desafio (treinar em 5 dias, bater a meta de estudo em 5 dias...) que vale 150 XP.
 - **Ideias para depois:** uma caixa para anotar a ideia que apareceu no meio de uma missão e voltar ao que estava fazendo.
 
 A imagem do personagem pode ser trocada em **Ajustes > Seu personagem**, escolhendo da galeria. Ela fica só no aparelho.
@@ -83,7 +83,7 @@ O projeto é Kotlin com Jetpack Compose, sem dependência de serviços do Google
 
 - `app/src/main/java/com/iacomthiago/levanta/`
   - `Data.kt`: missões (alarmes), ajustes, despertar em andamento e histórico (SharedPreferences).
-  - `Progresso.kt`: experiência, nível, sequência de dias, metas de estudo, missão da semana e a conversão dos dados do Levanta.
+  - `Progresso.kt`: experiência, nível, sequência de dias, blocos de estudo, missão da semana e a conversão dos dados do Levanta.
   - `Disciplina.kt`: peças da tela inicial e as telas de estudo, treino, diário e ideias.
   - `Scheduler.kt`: agendamento no AlarmManager e os receptores de alarme e de reinício.
   - `AlarmService.kt`: som, volume e a máquina de fases do despertar.

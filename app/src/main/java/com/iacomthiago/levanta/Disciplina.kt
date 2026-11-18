@@ -53,6 +53,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -243,16 +245,20 @@ class Situacao(val texto: String, val cor: Color, val feita: Boolean = false)
 /** Em que pé está a missão hoje. */
 fun situacao(alarme: Alarm, agora: Long): Situacao {
     val hoje = hojeTexto()
-    if (Jogo.feita(alarme, hoje)) return Situacao("Concluída", Cor.Verde, true)
+    if (Jogo.feita(alarme, hoje)) {
+        val blocos = Jogo.blocosDe(hoje).size
+        val texto = if (alarme.type == Tipo.ESTUDO && blocos > 0) "Meta batida · ${tempoDeBlocos(blocos)}" else "Concluída"
+        return Situacao(texto, Cor.Verde, true)
+    }
     val relogio = Instant.ofEpochMilli(agora).atZone(ZoneId.systemDefault()).toLocalTime()
     val passou = relogio.hour * 60 + relogio.minute >= alarme.hour * 60 + alarme.minute
     return when (alarme.type) {
         Tipo.ESTUDO -> {
-            val metas = Jogo.metasDe(hoje)
-            if (metas.isEmpty()) {
-                Situacao("Escreva as metas de hoje", Cor.Ouro)
+            val blocos = Jogo.blocosDe(hoje).size
+            if (blocos == 0) {
+                Situacao("Marque os blocos de 30 minutos", Cor.Ouro)
             } else {
-                Situacao("${metas.count { it.feitaEm != 0L }} de ${metas.size} metas", Cor.Lilas)
+                Situacao("$blocos de ${Jogo.metaDeBlocos()} blocos", Cor.Lilas)
             }
         }
 
@@ -314,7 +320,7 @@ fun LinhaMissaoDeHoje(alarme: Alarm, agora: Long, onAbrir: () -> Unit) {
                     Text("Concluir", fontWeight = FontWeight.SemiBold)
                 }
 
-                alarme.type == Tipo.ESTUDO -> Text("+${Xp.META} por meta", fontSize = 14.sp, color = Cor.Suave)
+                alarme.type == Tipo.ESTUDO -> Text("+${Xp.BLOCO} por bloco", fontSize = 14.sp, color = Cor.Suave)
 
                 else -> Text("+${Xp.daMissao(alarme.type)} XP", fontSize = 14.sp, color = Cor.Suave)
             }
@@ -326,7 +332,7 @@ fun tituloDoDesafio(s: Semana): String {
     val dias = if (s.alvo == 1) "1 dia" else "${s.alvo} dias"
     return when (s.desafio) {
         Tipo.TREINO -> "Treinar em $dias"
-        Tipo.ESTUDO -> "Fechar todas as metas de estudo em $dias"
+        Tipo.ESTUDO -> "Bater a meta de estudo em $dias"
         else -> "Cumprir a missão de levantar em $dias"
     }
 }
@@ -649,38 +655,39 @@ fun BotaoDeFalar(ditado: Ditado, rotulo: String, principal: Boolean = false) {
 
 // ---------- estudo ----------
 
+/** Um bloco de estudo de 30 minutos: tocar marca como feito; tocar de novo desmarca. */
 @Composable
-private fun LinhaMeta(meta: Meta, concluivel: Boolean, onResumir: (Long) -> Unit) {
-    val feita = meta.feitaEm != 0L
-    Cartao {
-        Text(meta.texto, fontSize = 18.sp, lineHeight = 24.sp, color = if (feita) Cor.Suave else Cor.Texto)
-        if (feita) {
-            Text("Concluída às ${hhmm(meta.feitaEm)}", fontSize = 14.sp, color = Cor.Verde)
-        } else {
-            Espaco(8)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (concluivel) {
-                    Button(
-                        onClick = { onResumir(meta.id) },
-                        shape = RoundedCornerShape(14.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Cor.Roxo, contentColor = Cor.SobreRoxo),
-                    ) {
-                        Text("Concluir meta", fontWeight = FontWeight.SemiBold)
-                    }
-                }
-                TextButton(onClick = { Jogo.excluirMeta(meta.id) }) {
-                    Text("Excluir", color = Cor.Suave)
-                }
-            }
+private fun CaixaDeBloco(numero: Int, feito: Boolean, modifier: Modifier = Modifier) {
+    val forma = RoundedCornerShape(14.dp)
+    Box(
+        modifier = modifier
+            .height(76.dp)
+            .clip(forma)
+            .background(if (feito) Cor.Roxo else Cor.CartaoAlto)
+            .border(1.dp, if (feito) Cor.Lilas else Cor.Linha, forma)
+            .clickable { Jogo.alternarBloco(numero) }
+            .semantics { contentDescription = if (feito) "Bloco $numero feito" else "Bloco $numero" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                numero.toString(),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (feito) Cor.SobreRoxo else Cor.Texto,
+            )
+            Text(
+                if (feito) "Feito" else "$MINUTOS_DO_BLOCO min",
+                fontSize = 12.sp,
+                color = if (feito) Cor.SobreRoxo else Cor.Suave,
+            )
         }
     }
-    Espaco(8)
 }
 
-/** Metas de estudo de hoje e de amanhã. Uma meta por linha; pode colar várias de uma vez. */
-@OptIn(ExperimentalMaterial3Api::class)
+/** O estudo do dia em blocos de 30 minutos: estudou um bloco, toca nele. Nada para escrever. */
 @Composable
-fun TelaEstudo(onVoltar: () -> Unit, onResumir: (Long) -> Unit, onDiario: () -> Unit, onIdeias: () -> Unit) {
+fun TelaEstudo(onVoltar: () -> Unit, onDiario: () -> Unit, onIdeias: () -> Unit) {
     val agora by produceState(System.currentTimeMillis()) {
         while (true) {
             value = System.currentTimeMillis()
@@ -688,176 +695,70 @@ fun TelaEstudo(onVoltar: () -> Unit, onResumir: (Long) -> Unit, onDiario: () -> 
         }
     }
     val hoje = remember(agora) { hojeTexto() }
-    val amanha = remember(agora) { LocalDate.now().plusDays(1).toString() }
     val hora = remember(agora) { Instant.ofEpochMilli(agora).atZone(ZoneId.systemDefault()).hour }
-    val metas = Jogo.metas
-    val deHoje = metas.filter { it.dia == hoje }
-    val deAmanha = metas.filter { it.dia == amanha }
-    val atrasadas = metas.filter { it.feitaEm == 0L && it.dia < hoje }
-    val feitas = deHoje.count { it.feitaEm != 0L }
+    val marcados = Jogo.blocosDe(hoje)
+    val alvo = Jogo.metaDeBlocos()
     val limite = Repo.config.studyBonusHour.coerceIn(1, 23)
     val fechado = Jogo.feitos.any { it.dia == hoje && it.tipo == Tipo.ESTUDO }
-    var texto by remember { mutableStateOf("") }
-    var paraAmanha by remember { mutableStateOf(false) }
-    val ditado = rememberDitado { falado ->
-        texto = if (texto.isBlank()) falado else texto.trimEnd() + "\n" + falado
-    }
 
     Pagina {
         Cabecalho("Estudo", onVoltar)
         CartaoGanho()
         Cartao(cor = Cor.CartaoAlto) {
             Text(
-                "METAS DE HOJE",
+                "ESTUDO DE HOJE",
                 color = Cor.Suave,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.2.sp,
             )
             Text(
-                if (deHoje.isEmpty()) "Nenhuma ainda" else "$feitas de ${deHoje.size}",
+                if (marcados.isEmpty()) "Nenhum bloco ainda" else tempoDeBlocos(marcados.size),
                 fontSize = 40.sp,
                 fontWeight = FontWeight.Bold,
                 color = if (fechado) Cor.Verde else Cor.Lilas,
             )
             Text(
+                "${marcados.size} de $alvo blocos para o dia contar",
+                fontSize = 16.sp,
+                color = if (fechado) Cor.Verde else Cor.Texto,
+            )
+            Espaco(8)
+            Barra((marcados.size.toFloat() / alvo.toFloat()).coerceIn(0f, 1f), if (fechado) Cor.Verde else Cor.Lilas)
+            Espaco(8)
+            Text(
                 when {
-                    fechado -> "Dia de estudo fechado."
-                    deHoje.isEmpty() -> "Escreva as metas e conclua todas até as $limite h para ganhar +${Xp.BONUS_ESTUDO} XP de bônus."
-                    hora < limite -> "Feche todas até as $limite h e ganhe +${Xp.BONUS_ESTUDO} XP de bônus."
-                    else -> "Passou das $limite h: o bônus de hoje ficou para trás, mas cada meta ainda vale +${Xp.META} XP."
+                    fechado -> "Meta de hoje batida. Cada bloco a mais continua valendo +${Xp.BLOCO} XP."
+                    hora < limite -> "Chegue a $alvo blocos até as $limite h e ganhe +${Xp.BONUS_ESTUDO} XP de bônus."
+                    else -> "Passou das $limite h: o bônus de hoje ficou para trás, mas cada bloco ainda vale +${Xp.BLOCO} XP."
                 },
                 fontSize = 15.sp,
                 color = Cor.Suave,
             )
         }
 
-        if (deHoje.isNotEmpty()) {
-            TituloSecao("Hoje")
-            for (meta in deHoje) {
-                LinhaMeta(meta, concluivel = true, onResumir = onResumir)
-            }
-        }
-
-        if (atrasadas.isNotEmpty()) {
-            Espaco(8)
-            Cartao {
-                Text(
-                    if (atrasadas.size == 1) "1 meta de dias anteriores ficou sem concluir."
-                    else "${atrasadas.size} metas de dias anteriores ficaram sem concluir.",
-                    fontSize = 16.sp,
-                    color = Cor.Ouro,
-                )
-                Espaco(10)
-                BotaoSecundario("Trazer para hoje") { Jogo.trazerAtrasadasParaHoje() }
-                Espaco(8)
-                BotaoSecundario("Descartar as antigas") { Jogo.descartarAtrasadas() }
-            }
-        }
-
-        TituloSecao("Adicionar metas")
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = !paraAmanha,
-                onClick = { paraAmanha = false },
-                label = { Text("Para hoje", fontSize = 15.sp) },
-            )
-            FilterChip(
-                selected = paraAmanha,
-                onClick = { paraAmanha = true },
-                label = { Text("Para amanhã", fontSize = 15.sp) },
-            )
-        }
-        Espaco(6)
-        OutlinedTextField(
-            value = texto,
-            onValueChange = { texto = it.take(4000) },
-            label = { Text("Uma meta por linha") },
-            placeholder = { Text("Pode colar várias de uma vez.") },
-            minLines = 3,
-            modifier = Modifier.fillMaxWidth(),
+        TituloSecao("Blocos de $MINUTOS_DO_BLOCO minutos")
+        Text(
+            "Estudou $MINUTOS_DO_BLOCO minutos? Toque em um bloco. Tocar de novo desmarca.",
+            fontSize = 15.sp,
+            color = Cor.Suave,
+            modifier = Modifier.padding(horizontal = 4.dp),
         )
         Espaco(10)
-        BotaoPrincipal("Adicionar metas", habilitado = texto.isNotBlank()) {
-            Jogo.adicionarMetas(texto, if (paraAmanha) amanha else hoje)
-            texto = ""
-        }
-        Espaco(10)
-        BotaoDeFalar(ditado, "Ditar uma meta")
-
-        if (deAmanha.isNotEmpty()) {
-            TituloSecao("Amanhã")
-            for (meta in deAmanha) {
-                LinhaMeta(meta, concluivel = false, onResumir = onResumir)
+        for (linha in (1..BLOCOS_POR_DIA).chunked(7)) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (numero in linha) {
+                    CaixaDeBloco(numero, numero in marcados, Modifier.weight(1f))
+                }
             }
+            Espaco(8)
         }
 
         TituloSecao("Mais")
-        BotaoSecundario("Diário de estudo", onClick = onDiario)
-        Espaco(10)
         BotaoSecundario("Anotar uma ideia para depois", onClick = onIdeias)
-        Espaco(20)
-    }
-}
-
-/**
- * Conclui uma meta: a pessoa fala (ou digita) um parágrafo curto sobre o que
- * estudou. O app só conta as palavras; não julga o conteúdo.
- */
-@Composable
-fun TelaResumo(metaId: Long, onVoltar: () -> Unit) {
-    val meta = Jogo.metas.firstOrNull { it.id == metaId }
-    if (meta == null || meta.feitaEm != 0L) {
-        LaunchedEffect(Unit) { onVoltar() }
-        return
-    }
-    var texto by remember { mutableStateOf("") }
-    val minimo = Repo.config.minWords.coerceIn(1, 200)
-    val palavras = contarPalavras(texto)
-    val ditado = rememberDitado { falado -> texto = (texto.trimEnd() + " " + falado).trim() }
-
-    Pagina {
-        Cabecalho("Concluir meta", onVoltar)
-        Cartao(cor = Cor.CartaoAlto) {
-            Text(
-                "META",
-                color = Cor.Suave,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.2.sp,
-            )
-            Text(meta.texto, fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold)
-        }
-        Espaco(14)
-        Text(
-            "Fale um parágrafo curto: o que você estudou, o que aprendeu ou que dúvida foi resolvida.",
-            fontSize = 16.sp,
-            lineHeight = 22.sp,
-            color = Cor.Suave,
-        )
-        Espaco(12)
-        BotaoDeFalar(
-            ditado,
-            if (texto.isBlank()) "Falar agora" else "Falar mais",
-            principal = palavras < minimo,
-        )
-        // O contador fica acima do campo para continuar visível com o teclado aberto.
-        Text(
-            "$palavras de $minimo palavras",
-            fontSize = 14.sp,
-            color = if (palavras >= minimo) Cor.Verde else Cor.Suave,
-            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
-        )
-        OutlinedTextField(
-            value = texto,
-            onValueChange = { texto = it.take(4000) },
-            label = { Text("Seu resumo") },
-            minLines = 4,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Espaco(16)
-        BotaoPrincipal("Guardar e concluir (+${Xp.META} XP)", habilitado = palavras >= minimo) {
-            Jogo.concluirMeta(meta.id, texto)
+        if (Jogo.metas.any { it.feitaEm != 0L }) {
+            Espaco(10)
+            BotaoSecundario("Diário das metas antigas", onClick = onDiario)
         }
         Espaco(20)
     }
@@ -874,7 +775,7 @@ fun TelaDiario(onVoltar: () -> Unit) {
         Cabecalho("Diário de estudo", onVoltar)
         if (entradas.isEmpty()) {
             Text(
-                "Cada meta de estudo concluída entra aqui com o resumo que você falou.",
+                "Aqui ficam os resumos das metas escritas no jeito antigo. Não há nenhum guardado.",
                 color = Cor.Suave,
                 fontSize = 16.sp,
                 modifier = Modifier.padding(4.dp),

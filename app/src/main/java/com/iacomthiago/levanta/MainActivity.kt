@@ -117,7 +117,6 @@ private sealed interface Tela {
     data class Treino(val passo: String) : Tela
     data class Missao(val id: Int) : Tela
     data object Estudo : Tela
-    data class Resumo(val metaId: Long) : Tela
     data class Diario(val doEstudo: Boolean) : Tela
     data class Ideias(val doEstudo: Boolean) : Tela
 }
@@ -125,13 +124,12 @@ private sealed interface Tela {
 /** Para onde o botão de voltar leva a partir de cada tela. */
 private fun anterior(tela: Tela): Tela = when (tela) {
     is Tela.Cadastro, is Tela.Treino -> Tela.Ajustes
-    is Tela.Resumo -> Tela.Estudo
     is Tela.Diario -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
     is Tela.Ideias -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
     else -> Tela.Inicio
 }
 
-/** Tela de cada tipo de missão: estudo abre as metas, treino e simples têm tela própria, levantar abre a edição. */
+/** Tela de cada tipo de missão: estudo abre os blocos, treino e simples têm tela própria, levantar abre a edição. */
 private fun telaDaMissao(alarme: Alarm): Tela = when (alarme.type) {
     Tipo.ESTUDO -> Tela.Estudo
     Tipo.TREINO, Tipo.SIMPLES -> Tela.Missao(alarme.id)
@@ -199,12 +197,10 @@ private fun AppPrincipal() {
 
         is Tela.Estudo -> TelaEstudo(
             onVoltar = { tela = Tela.Inicio },
-            onResumir = { tela = Tela.Resumo(it) },
             onDiario = { tela = Tela.Diario(doEstudo = true) },
             onIdeias = { tela = Tela.Ideias(doEstudo = true) },
         )
 
-        is Tela.Resumo -> TelaResumo(atual.metaId, onVoltar = { tela = Tela.Estudo })
         is Tela.Diario -> TelaDiario(onVoltar = { tela = anterior(atual) })
         is Tela.Ideias -> TelaIdeias(onVoltar = { tela = anterior(atual) })
     }
@@ -360,9 +356,11 @@ private fun TelaInicio(
         }
 
         TituloSecao("Mais")
-        BotaoSecundario("Diário de estudo", onClick = onDiario)
-        Espaco(10)
         BotaoSecundario("Ideias para depois", onClick = onIdeias)
+        if (Jogo.metas.any { it.feitaEm != 0L }) {
+            Espaco(10)
+            BotaoSecundario("Diário das metas antigas", onClick = onDiario)
+        }
         Espaco(20)
     }
 }
@@ -419,8 +417,8 @@ private fun LinhaAlarme(alarme: Alarm, onAbrir: () -> Unit, onLigar: (Boolean) -
 
 private fun descricaoDoTipo(tipo: String): String = when (tipo) {
     Tipo.ESTUDO ->
-        "Lista de metas do dia. Cada meta se conclui com um resumo falado e vale +${Xp.META} XP. " +
-            "Fechar todas antes da hora combinada dá bônus."
+        "Blocos de $MINUTOS_DO_BLOCO minutos para marcar com um toque. Cada bloco vale +${Xp.BLOCO} XP. " +
+            "Bater a meta do dia antes da hora combinada dá bônus."
 
     Tipo.TREINO ->
         "Na hora, abre o seu treino no navegador. Na volta, você toca em Concluí. Vale +${Xp.TREINO} XP."
@@ -658,8 +656,15 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
             LinhaNumero("Bônus de estudo até", c.studyBonusHour, 8..22, rotulo = { "$it h" }) {
                 Repo.updateConfig(c.copy(studyBonusHour = it))
             }
-            LinhaNumero("Palavras no resumo da meta", c.minWords, 5..60, passo = 5) {
-                Repo.updateConfig(c.copy(minWords = it))
+            LinhaNumero(
+                "Blocos de estudo para o dia contar",
+                c.studyBlocks.coerceIn(1, BLOCOS_POR_DIA),
+                1..BLOCOS_POR_DIA,
+                rotulo = { "$it (${tempoDeBlocos(it)})" },
+            ) {
+                Repo.updateConfig(c.copy(studyBlocks = it))
+                // Baixar a meta pode fechar o dia de hoje com os blocos já marcados.
+                Jogo.conferirEstudo()
             }
             LinhaChave(
                 "Avisar se a sequência está em risco",
