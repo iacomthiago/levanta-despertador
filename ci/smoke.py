@@ -301,6 +301,27 @@ def voltar_para_o_app():
     time.sleep(3)
 
 
+def escrever_resumo():
+    """Digita o resumo aos poucos, até passar do mínimo de palavras.
+
+    O emulador engole teclas quando o texto vem comprido de uma vez só, então
+    o contador da tela é que diz quando parar.
+    """
+    for _ in range(16):
+        contagem = None
+        for t in textos(dump()):
+            m = re.fullmatch(r"(\d+) de (\d+) palavras", t)
+            if m:
+                contagem = (int(m.group(1)), int(m.group(2)))
+        if contagem and contagem[0] > contagem[1]:
+            return True
+        digitar("estudei o artigo e entendi ")
+        time.sleep(1.0)
+    problemas.append(f"O resumo não chegou ao mínimo de palavras. Na tela: {textos(dump())}")
+    log(problemas[-1])
+    return False
+
+
 def estudar():
     """Escreve duas metas e conclui cada uma com um resumo digitado (o emulador não fala)."""
     if not tocar_rolando("Escreva as metas de hoje", contendo=True):
@@ -320,7 +341,6 @@ def estudar():
         return False
     shot("16-estudo-metas")
 
-    resumo = " ".join(["estudei", "o", "artigo", "e", "entendi", "a", "regra"] * 3)  # 21 palavras
     for feitas in (1, 2):
         if not tocar_rolando("Concluir meta"):
             return False
@@ -328,7 +348,8 @@ def estudar():
             return False
         if not tocar_campo():
             return False
-        digitar(resumo)
+        if not escrever_resumo():
+            return False
         fechar_teclado()
         if feitas == 1:
             shot("17-resumo-da-meta")
