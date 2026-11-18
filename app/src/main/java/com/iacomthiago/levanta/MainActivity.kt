@@ -222,7 +222,7 @@ fun Cabecalho(titulo: String, onVoltar: () -> Unit) {
     Espaco(6)
 }
 
-/// ---------- início ----------
+// ---------- início ----------
 
 @Composable
 private fun TelaInicio(
@@ -601,7 +601,7 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
     }
 }
 
-/ ---------- ajustes ----------
+// ---------- ajustes ----------
 
 @Composable
 private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar: (String) -> Unit) {
