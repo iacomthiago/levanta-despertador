@@ -34,7 +34,7 @@ Quem já usava o Levanta não perde nada ao atualizar: os alarmes viram missões
    - **Questões do concurso:** afirmações de certo ou errado sobre Constituição e Licitações, até somar o número de acertos pedido. Errou, lê a explicação e responde outra. Primeiro aparecem as que você errou e as que ainda não viu.
    - **Contas:** resolver contas num teclado próprio na tela.
    - **Frase:** montar sua frase de compromisso tocando nas palavras na ordem certa.
-   - **Missão surpresa:** uma extra, sorteada a cada despertar. Ou falar sua afirmação em voz alta para o tablet ouvir (e ele responde em voz alta com uma frase de apoio), ou repetir uma sequência de quadros que acendem.
+   - **Falar a afirmação:** uma extra a cada despertar. Você fala sua afirmação em voz alta para o tablet ouvir, e ele responde em voz alta com uma frase de apoio. Se o tablet não conseguir ouvir (microfone não liberado ou sem reconhecimento de voz), entra no lugar uma sequência de quadros que acendem, para repetir de memória.
 3. **Trégua.** Enquanto você está resolvendo, o som fica baixo. Parou de mexer por 30 segundos, o volume volta. O teto é de 3 minutos por missão.
 4. **Checagem.** Minutos depois, o tablet pergunta "você continua de pé?". Sem resposta em 45 segundos, é recaída: o alarme volta e a missão recomeça.
 5. **Fim.** Passou pela checagem, o despertar entra no histórico, a tela de bom dia mostra quantos dias faltam para a prova e, se você quiser, o app do Claude abre em seguida.
@@ -43,7 +43,7 @@ Na véspera, o app também avisa a **hora de dormir**: um toque meia hora antes 
 
 Se ninguém atender em 20 minutos, o alarme desiste e registra "sem resposta" no histórico. Reiniciar o tablet no meio não adianta: ao ligar de novo, o alarme retoma.
 
-Tudo é configurável em **Ajustes**: quais missões, quantos acertos e quantas contas, a frase, a afirmação, a data da prova, número de checagens e intervalo, sonecas permitidas (o padrão é nenhuma), música de abertura e volume crescente. Lá também dá para treinar as duas missões surpresa fora do alarme.
+Tudo é configurável em **Ajustes**: quais missões, quantos acertos e quantas contas, a frase, a afirmação, a data da prova, número de checagens e intervalo, sonecas permitidas (o padrão é nenhuma), música de abertura e volume crescente. Lá também dá para treinar a missão de falar e a de memória fora do alarme.
 
 ## Instalar no tablet
 
@@ -61,7 +61,7 @@ Ao abrir o app, um cartão amarelo lista o que falta liberar. Toque em **Liberar
 - **Notificações** e **tela cheia:** é o que deixa o alarme abrir sozinho com o tablet bloqueado.
 - **Economia de bateria:** escolha "Permitir". Sem isso a Samsung pode encerrar o app durante a noite.
 - **Aparecer sobre outros apps** (recomendado): faz o alarme tomar a tela mesmo se você estiver usando o tablet.
-- **Microfone** (opcional): deixa o tablet ouvir sua afirmação na missão surpresa. O reconhecimento de voz usa o serviço do próprio Android e normalmente precisa de internet; se falhar, a saída é montar a frase tocando nas palavras.
+- **Microfone** (opcional): deixa o tablet ouvir sua afirmação. O reconhecimento de voz usa o serviço do próprio Android e normalmente precisa de internet; se falhar, a saída é montar a frase tocando nas palavras.
 
 Em tablets Samsung, confira também em **Configurações > Bateria > Limites de uso em segundo plano** que o Disciplina não está em "Apps em suspensão" nem em "Apps em suspensão profunda".
 

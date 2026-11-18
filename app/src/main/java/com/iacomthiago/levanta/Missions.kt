@@ -92,14 +92,14 @@ fun vozDisponivel(context: Context): Boolean =
         false
     }
 
-/** Sorteia a missão surpresa, sem repetir a da última vez quando há mais de uma opção. */
+/**
+ * A missão extra do despertar: sempre falar a afirmação em voz alta (pedido do
+ * Thiago em 18/11/2026; antes alternava com a de memória). A de memória fica
+ * de reserva para quando o tablet não consegue ouvir.
+ */
 fun sortearSurpresa(context: Context): String {
-    val opcoes = buildList {
-        if (vozDisponivel(context) && palavrasDaFrase(Repo.config.affirmation).size >= 2) add(PASSO_VOZ)
-        add(PASSO_MEMORIA)
-    }
-    val anterior = Repo.lastSurprise
-    val escolha = opcoes.filter { it != anterior }.ifEmpty { opcoes }.random()
+    val daParaFalar = vozDisponivel(context) && palavrasDaFrase(Repo.config.affirmation).size >= 2
+    val escolha = if (daParaFalar) PASSO_VOZ else PASSO_MEMORIA
     Repo.lastSurprise = escolha
     return escolha
 }
@@ -140,9 +140,8 @@ fun FluxoDeMissoes(onConcluir: () -> Unit) {
     }
 
     Pagina(centralizar = true) {
-        val surpresa = passos[indice] == PASSO_VOZ || passos[indice] == PASSO_MEMORIA
         Text(
-            "MISSÃO ${indice + 1} DE ${passos.size}" + if (surpresa) " · SURPRESA" else "",
+            "MISSÃO ${indice + 1} DE ${passos.size}",
             color = Cor.Lilas,
             fontSize = 14.sp,
             fontWeight = FontWeight.Bold,

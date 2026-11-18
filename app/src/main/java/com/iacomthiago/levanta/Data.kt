@@ -90,7 +90,7 @@ data class Config(
     /** Questões de certo ou errado do concurso; [quizCount] é o número de acertos exigido. */
     val quizEnabled: Boolean = true,
     val quizCount: Int = 5,
-    /** Missão extra sorteada a cada despertar (falar a afirmação ou memória). */
+    /** Missão extra a cada despertar: falar a afirmação (memória só se não der para ouvir). */
     val surpriseEnabled: Boolean = true,
     val affirmation: String = DEFAULT_AFFIRMATION,
     /** O que o app responde em voz alta depois de ouvir a afirmação; vazio desliga a resposta. */

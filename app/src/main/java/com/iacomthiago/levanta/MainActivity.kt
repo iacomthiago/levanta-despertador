@@ -751,8 +751,8 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
         Espaco(10)
         Cartao {
             LinhaChave(
-                "Missão surpresa",
-                "Uma missão extra sorteada a cada despertar: falar sua afirmação em voz alta ou repetir uma sequência de memória.",
+                "Falar a afirmação",
+                "Uma missão extra a cada despertar: falar sua afirmação em voz alta. Se o tablet não conseguir ouvir, entra uma sequência de memória.",
                 c.surpriseEnabled,
             ) { Repo.updateConfig(c.copy(surpriseEnabled = it)) }
             if (c.surpriseEnabled) {
@@ -779,7 +779,7 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                 Espaco(8)
                 if (!microfone) {
                     Text(
-                        "Para o tablet ouvir a afirmação, libere o microfone. Sem isso, a surpresa é sempre a de memória.",
+                        "Para o tablet ouvir a afirmação, libere o microfone. Sem isso, entra a sequência de memória no lugar.",
                         fontSize = 14.sp,
                         color = Cor.Ouro,
                     )
@@ -788,7 +788,7 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                     Espaco(8)
                 } else if (!vozDisponivel(context)) {
                     Text(
-                        "Este tablet não tem reconhecimento de voz ativo; a surpresa será sempre a de memória.",
+                        "Este tablet não tem reconhecimento de voz ativo; no lugar entra a sequência de memória.",
                         fontSize = 14.sp,
                         color = Cor.Ouro,
                     )
