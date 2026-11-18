@@ -85,6 +85,16 @@ def dump():
                     "enabled": n.get("enabled") == "true",
                 }
             )
+        # Em máquina lenta o emulador às vezes abre "<app do sistema> isn't
+        # responding" por cima de tudo. Não é do nosso app: toca em "Wait" e relê.
+        if any("isn't responding" in n["text"] for n in nos):
+            esperar_botao = [n for n in nos if n["text"] == "Wait"]
+            quem = next(n["text"] for n in nos if "isn't responding" in n["text"])
+            if "Disciplina" not in quem and esperar_botao:
+                log(f"aviso do emulador fechado: {quem!r}")
+                sh(f"input tap {esperar_botao[-1]['cx']} {esperar_botao[-1]['cy']}")
+                time.sleep(2)
+                continue
         return nos
     return []
 
