@@ -814,6 +814,176 @@ fun TelaDiario(onVoltar: () -> Unit) {
     }
 }
 
+// ---------- recompensas ----------
+
+/** Quanto falta de experiência para chegar ao [nivel]. */
+private fun faltaPara(nivel: Int): Int = (xpDoNivel(nivel) - Jogo.xp).coerceAtLeast(0)
+
+private fun textoDosTurbos(n: Int): String = if (n == 1) "1 turbo guardado" else "$n turbos guardados"
+
+/** Resumo das recompensas na tela inicial. Tocar abre a tela de recompensas. */
+@Composable
+fun CartaoRecompensas(onAbrir: () -> Unit) {
+    val marco = Jogo.proximoMarco()
+    val premio = Jogo.premioDoNivel(marco)
+    Cartao(modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onAbrir)) {
+        Text(
+            "RECOMPENSAS",
+            color = Cor.Suave,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.2.sp,
+        )
+        Espaco(4)
+        Text("Próxima no nível $marco", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Faltam ${faltaPara(marco)} XP · +1 turbo" + if (premio.isEmpty()) "" else " e $premio",
+            fontSize = 15.sp,
+            color = Cor.Suave,
+        )
+        Espaco(6)
+        if (Jogo.turboLigado()) {
+            Text(
+                "Turbo ligado hoje: tudo vale o dobro.",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Cor.Ouro,
+            )
+        } else {
+            Text(
+                textoDosTurbos(Jogo.turbos),
+                fontSize = 15.sp,
+                color = if (Jogo.turbos > 0) Cor.Ouro else Cor.Suave,
+            )
+        }
+        if (premio.isEmpty()) {
+            Text("Toque para escolher os seus prêmios.", fontSize = 14.sp, color = Cor.Lilas)
+        }
+    }
+}
+
+/** Turbos para usar e os prêmios da vida real combinados para cada nível de recompensa. */
+@Composable
+fun TelaRecompensas(onVoltar: () -> Unit) {
+    var texto by remember { mutableStateOf(Jogo.premios) }
+    val ditado = rememberDitado { falado ->
+        texto = if (texto.isBlank()) falado else texto.trimEnd() + "\n" + falado
+    }
+    val nivel = Jogo.nivel
+    val combinados = Jogo.premios.split('\n').count { it.isNotBlank() }
+    val ultimo = maxOf(Jogo.proximoMarco(), combinados * NIVEIS_POR_RECOMPENSA)
+    val marcos = (NIVEIS_POR_RECOMPENSA..ultimo step NIVEIS_POR_RECOMPENSA).toList().takeLast(12)
+
+    Pagina {
+        Cabecalho("Recompensas", onVoltar)
+        CartaoGanho()
+        Cartao(cor = Cor.CartaoAlto) {
+            Text(
+                "TURBO",
+                color = Cor.Suave,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.2.sp,
+            )
+            Text(
+                textoDosTurbos(Jogo.turbos),
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (Jogo.turbos > 0) Cor.Ouro else Cor.Lilas,
+            )
+            Text(
+                "Um turbo faz o dia inteiro valer o dobro de XP, incluindo o que você já fez hoje. " +
+                    "Você ganha um a cada $NIVEIS_POR_RECOMPENSA níveis e a cada $DIAS_POR_TURBO dias de sequência.",
+                fontSize = 15.sp,
+                color = Cor.Suave,
+            )
+            Espaco(12)
+            if (Jogo.turboLigado()) {
+                Text(
+                    "Turbo ligado hoje: tudo vale o dobro.",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Cor.Ouro,
+                )
+            } else {
+                BotaoPrincipal("Usar um turbo hoje (XP em dobro)", habilitado = Jogo.turbos > 0) {
+                    Jogo.usarTurbo()
+                }
+            }
+        }
+
+        TituloSecao("Prêmios da vida real")
+        Text(
+            "Escreva um prêmio por linha. O primeiro é o do nível $NIVEIS_POR_RECOMPENSA, " +
+                "o segundo o do nível ${NIVEIS_POR_RECOMPENSA * 2}, e assim por diante.",
+            fontSize = 15.sp,
+            color = Cor.Suave,
+            modifier = Modifier.padding(horizontal = 4.dp),
+        )
+        Espaco(8)
+        OutlinedTextField(
+            value = texto,
+            onValueChange = { texto = it.take(2000) },
+            label = { Text("Um prêmio por linha") },
+            minLines = 3,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Espaco(10)
+        BotaoPrincipal("Guardar prêmios", habilitado = texto.trim() != Jogo.premios.trim()) {
+            Jogo.definirPremios(texto)
+        }
+        Espaco(10)
+        BotaoDeFalar(ditado, "Ditar um prêmio")
+
+        TituloSecao("Níveis de recompensa")
+        for (marco in marcos) {
+            val premio = Jogo.premioDoNivel(marco)
+            val alcancado = nivel >= marco
+            Cartao {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "Nível $marco",
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (alcancado) Cor.Verde else Cor.Texto,
+                        )
+                        Text(
+                            if (premio.isEmpty()) "+1 turbo · sem prêmio escolhido" else "+1 turbo",
+                            fontSize = 14.sp,
+                            color = Cor.Suave,
+                        )
+                        if (premio.isNotEmpty()) {
+                            Text("Prêmio: $premio", fontSize = 17.sp, color = Cor.Texto)
+                        }
+                        Text(
+                            if (alcancado) "Alcançado" else "Faltam ${faltaPara(marco)} XP",
+                            fontSize = 14.sp,
+                            color = if (alcancado) Cor.Verde else Cor.Suave,
+                        )
+                    }
+                    if (alcancado && premio.isNotEmpty()) {
+                        Spacer(Modifier.width(8.dp))
+                        if (marco in Jogo.premiosPegos) {
+                            Text("Pego", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Cor.Verde)
+                        } else {
+                            Button(
+                                onClick = { Jogo.pegarPremio(marco) },
+                                shape = RoundedCornerShape(14.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Cor.Roxo, contentColor = Cor.SobreRoxo),
+                            ) {
+                                Text("Já peguei", fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+            Espaco(8)
+        }
+        Espaco(20)
+    }
+}
+
 // ---------- ideias para depois ----------
 
 /** Lugar para largar uma ideia que apareceu no meio de uma missão e voltar ao que estava fazendo. */

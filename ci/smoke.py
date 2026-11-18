@@ -409,6 +409,31 @@ def missao_simples():
     return True
 
 
+def usar_turbo():
+    """Combina um prêmio, liga o turbo de teste e volta para a tela inicial."""
+    if not tocar_rolando("RECOMPENSAS"):
+        return False
+    if not esperar("1 turbo guardado", 15):
+        return False
+    if not tocar_campo():
+        return False
+    digitar("Pizza")
+    fechar_teclado()
+    if not tocar_rolando("Guardar prêmios"):
+        return False
+    if not procurar("Prêmio: Pizza"):
+        return False
+    shot("19-recompensas")
+    if not tocar_rolando("Usar um turbo hoje (XP em dobro)"):
+        return False
+    if not procurar("Turbo ligado hoje: tudo vale o dobro."):
+        return False
+    shot("19-turbo-ligado")
+    sh("input keyevent 4")
+    time.sleep(1.5)
+    return True
+
+
 def treinar():
     """Zera o tempo mínimo do treino, começa (abre o navegador), volta e conclui."""
     if not tocar_rolando("TREINO", contendo=True):
@@ -500,9 +525,15 @@ def conferir_disciplina():
         return False
     total = conferir_ganho(total, (10,), "a missão simples")
 
+    if not usar_turbo():
+        return False
+    # O turbo dobra o que já foi ganho hoje: os blocos, o bônus de estudo e a missão simples.
+    total = conferir_ganho(total, (160, 110), "o turbo")
+
     if not treinar():
         return False
-    total = conferir_ganho(total, (40,), "o treino")
+    # Com o turbo ligado, o treino de 40 vale 80.
+    total = conferir_ganho(total, (80,), "o treino com turbo")
     shot("24-inicio-com-progresso")
 
     return anotar_ideia()
@@ -571,7 +602,7 @@ def main():
     sh("input keyevent 224")  # acorda a tela
     sh("wm dismiss-keyguard")
 
-    log(sh(f"am start -W -n {PKG}/.MainActivity --ez sem_surpresa true").strip())
+    log(sh(f"am start -W -n {PKG}/.MainActivity --ez sem_surpresa true --ez turbo_de_teste true").strip())
     time.sleep(5)
     shot("01-inicio")
     log("tela inicial: " + str(textos(dump())))

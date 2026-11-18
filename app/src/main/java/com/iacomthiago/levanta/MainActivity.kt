@@ -76,6 +76,10 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("sem_surpresa", false) == true) {
             Repo.updateConfig(Repo.config.copy(surpriseEnabled = false))
         }
+        // Também só do teste automático: um turbo para conferir a experiência em dobro.
+        if (intent?.getBooleanExtra("turbo_de_teste", false) == true) {
+            Jogo.turboDeTeste()
+        }
         Scheduler.rescheduleAll(this)
         AlarmService.resumeIfNeeded(this)
         lerPedido(intent)
@@ -117,6 +121,7 @@ private sealed interface Tela {
     data class Treino(val passo: String) : Tela
     data class Missao(val id: Int) : Tela
     data object Estudo : Tela
+    data object Recompensas : Tela
     data class Diario(val doEstudo: Boolean) : Tela
     data class Ideias(val doEstudo: Boolean) : Tela
 }
@@ -162,6 +167,7 @@ private fun AppPrincipal() {
             onHistorico = { tela = Tela.Historico },
             onDiario = { tela = Tela.Diario(doEstudo = false) },
             onIdeias = { tela = Tela.Ideias(doEstudo = false) },
+            onRecompensas = { tela = Tela.Recompensas },
         )
 
         is Tela.Editar -> TelaEditar(atual.alarme, onVoltar = { tela = Tela.Inicio })
@@ -201,6 +207,7 @@ private fun AppPrincipal() {
             onIdeias = { tela = Tela.Ideias(doEstudo = true) },
         )
 
+        is Tela.Recompensas -> TelaRecompensas(onVoltar = { tela = Tela.Inicio })
         is Tela.Diario -> TelaDiario(onVoltar = { tela = anterior(atual) })
         is Tela.Ideias -> TelaIdeias(onVoltar = { tela = anterior(atual) })
     }
@@ -228,6 +235,7 @@ private fun TelaInicio(
     onHistorico: () -> Unit,
     onDiario: () -> Unit,
     onIdeias: () -> Unit,
+    onRecompensas: () -> Unit,
 ) {
     val context = LocalContext.current
     val alarmes = Repo.alarms
@@ -281,6 +289,8 @@ private fun TelaInicio(
 
         CartaoGanho()
         CartaoHeroi()
+        Espaco(12)
+        CartaoRecompensas(onAbrir = onRecompensas)
 
         Preparacao()
 

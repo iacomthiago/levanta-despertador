@@ -35,6 +35,12 @@ fun tempoDeBlocos(n: Int): String {
     }
 }
 
+/** A cada tantos níveis sai uma recompensa: um turbo e o prêmio da vida real combinado. */
+const val NIVEIS_POR_RECOMPENSA = 5
+
+/** A cada tantos dias seguidos de sequência sai mais um turbo. */
+const val DIAS_POR_TURBO = 7
+
 /** Quanto vale cada coisa. Estudo é o que mais rende: cada bloco conta, e bater a meta do dia cedo dá bônus. */
 object Xp {
     const val LEVANTAR = 30
@@ -128,6 +134,26 @@ object Jogo {
     /** Blocos de estudo marcados em cada dia: dia (aaaa-mm-dd) para os números dos blocos. */
     var blocos by mutableStateOf(mapOf<String, Set<Int>>())
         private set
+
+    /** Turbos guardados: cada um faz um dia inteiro valer o dobro de experiência. */
+    var turbos by mutableStateOf(0)
+        private set
+
+    /** Dia (aaaa-mm-dd) em que um turbo foi ligado; vale até o dia virar. */
+    var turboEm by mutableStateOf("")
+        private set
+
+    /** Maior nível de recompensa já entregue (múltiplo de [NIVEIS_POR_RECOMPENSA]). */
+    var marcoPago by mutableStateOf(0)
+        private set
+
+    /** Prêmios da vida real, um por linha: o primeiro é o do nível 5, o segundo o do 10, e assim por diante. */
+    var premios by mutableStateOf("")
+        private set
+
+    /** Níveis de recompensa cujo prêmio da vida real já foi pego. */
+    var premiosPegos by mutableStateOf(setOf<Int>())
+        private set
     var ideias by mutableStateOf(listOf<Ideia>())
         private set
 
@@ -218,6 +244,12 @@ object Jogo {
             recorde = o.optInt("recorde", sequencia)
             fechadoAte = o.optString("fechadoAte", "")
             imagem = o.optLong("imagem", 0L)
+            turbos = o.optInt("turbos", 0)
+            turboEm = o.optString("turboEm", "")
+            marcoPago = o.optInt("marcoPago", 0)
+            premios = o.optString("premios", "")
+            val pegos = o.optJSONArray("premiosPegos")
+            premiosPegos = if (pegos == null) emptySet() else (0 until pegos.length()).map { pegos.optInt(it) }.toSet()
             val s = o.optJSONObject("semana")
             semana = if (s == null) null else Semana(
                 inicio = s.optString("inicio", ""),
@@ -298,6 +330,11 @@ object Jogo {
             .put("recorde", recorde)
             .put("fechadoAte", fechadoAte)
             .put("imagem", imagem)
+            .put("turbos", turbos)
+            .put("turboEm", turboEm)
+            .put("marcoPago", marcoPago)
+            .put("premios", premios)
+            .put("premiosPegos", JSONArray(premiosPegos.sorted()))
         val s = semana
         if (s != null) {
             o.put(
@@ -352,11 +389,12 @@ object Jogo {
         xp += valor
         val depois = nivelDe(xp)
         val subiu = if (depois > antes) depois else 0
+        val linhas = listOf(motivo) + conferirRecompensas()
         val anterior = ganho
         ganho = if (anterior != null && agora - anterior.em < 5_000L) {
-            Ganho(anterior.xp + valor, anterior.linhas + motivo, maxOf(anterior.nivel, subiu), agora)
+            Ganho(anterior.xp + valor, anterior.linhas + linhas, maxOf(anterior.nivel, subiu), agora)
         } else {
-            Ganho(valor, listOf(motivo), subiu, agora)
+            Ganho(valor, linhas, subiu, agora)
         }
     }
 
@@ -408,7 +446,7 @@ object Jogo {
         val dia = hojeTexto()
         if (alarme.type == Tipo.ESTUDO || alarme.type == Tipo.LEVANTAR) return 0
         if (feita(alarme, dia)) return 0
-        val valor = Xp.daMissao(alarme.type)
+        val valor = Xp.daMissao(alarme.type) * multiplicador(dia)
         registrar(Feito(dia, alarme.id, alarme.type, System.currentTimeMillis(), valor), "${alarme.nome}: concluída")
         Lembrete.limpar(app, alarme.id)
         return valor
@@ -418,7 +456,7 @@ object Jogo {
     fun concluirLevantar(alarmId: Int, tocouEm: Long) {
         val dia = Instant.ofEpochMilli(tocouEm).atZone(ZoneId.systemDefault()).toLocalDate().toString()
         if (feitos.any { it.dia == dia && it.alarmId == alarmId }) return
-        registrar(Feito(dia, alarmId, Tipo.LEVANTAR, System.currentTimeMillis(), Xp.LEVANTAR), "Você levantou")
+        registrar(Feito(dia, alarmId, Tipo.LEVANTAR, System.currentTimeMillis(), Xp.LEVANTAR * multiplicador(dia)), "Você levantou")
     }
 
     /** Missões de hoje que contam para a sequência e ainda não foram concluídas. */
@@ -465,7 +503,18 @@ object Jogo {
         }
         while (cursor.isBefore(hoje)) {
             when (diaCompleto(cursor)) {
-                true -> total += 1
+                true -> {
+                    total += 1
+                    if (total % DIAS_POR_TURBO == 0) {
+                        turbos += 1
+                        ganho = Ganho(
+                            0,
+                            listOf("$total dias de sequência: você ganhou +1 turbo"),
+                            0,
+                            System.currentTimeMillis(),
+                        )
+                    }
+                }
                 false -> total = 0
                 null -> {}
             }
@@ -502,7 +551,7 @@ object Jogo {
         if (numero in marcados) {
             blocos = blocos + (hoje to (marcados - numero))
             salvarBlocos()
-            perder(Xp.BLOCO)
+            perder(Xp.BLOCO * multiplicador(hoje))
             desfazerEstudoSeFaltar(hoje)
             salvar()
         } else {
@@ -510,7 +559,7 @@ object Jogo {
             // Guarda pouco mais de um ano; os dias mais antigos saem.
             blocos = todos.keys.sorted().takeLast(400).associateWith { todos.getValue(it) }
             salvarBlocos()
-            ganhar(Xp.BLOCO, "Bloco de estudo de $MINUTOS_DO_BLOCO minutos")
+            ganhar(Xp.BLOCO * multiplicador(hoje), "Bloco de estudo de $MINUTOS_DO_BLOCO minutos")
             salvar()
             conferirEstudo()
         }
@@ -524,7 +573,7 @@ object Jogo {
         val limite = Repo.config.studyBonusHour.coerceIn(1, 23)
         val noPrazo = LocalTime.now().hour < limite
         registrar(
-            Feito(hoje, ID_ESTUDO, Tipo.ESTUDO, System.currentTimeMillis(), if (noPrazo) Xp.BONUS_ESTUDO else 0),
+            Feito(hoje, ID_ESTUDO, Tipo.ESTUDO, System.currentTimeMillis(), if (noPrazo) Xp.BONUS_ESTUDO * multiplicador(hoje) else 0),
             if (noPrazo) "Meta de estudo batida antes das $limite h" else "Meta de estudo do dia batida",
         )
     }
@@ -609,6 +658,77 @@ object Jogo {
         if (s.premiada || progressoDaSemana(s) < s.alvo) return
         semana = s.copy(premiada = true)
         ganhar(Xp.SEMANA, "Missão da semana cumprida")
+    }
+
+    // ---------- recompensas ----------
+
+    fun turboLigado(dia: String = hojeTexto()): Boolean = turboEm == dia
+
+    /** Por quanto se multiplica a experiência das missões e dos blocos de [dia]. */
+    fun multiplicador(dia: String = hojeTexto()): Int = if (turboLigado(dia)) 2 else 1
+
+    /** O prêmio da vida real combinado para o [nivel] (5, 10, 15...), ou vazio se não há. */
+    fun premioDoNivel(nivel: Int): String {
+        val linhas = premios.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
+        return linhas.getOrNull(nivel / NIVEIS_POR_RECOMPENSA - 1).orEmpty()
+    }
+
+    /** O próximo nível que dá recompensa. */
+    fun proximoMarco(): Int = (nivel / NIVEIS_POR_RECOMPENSA + 1) * NIVEIS_POR_RECOMPENSA
+
+    fun definirPremios(texto: String) {
+        premios = texto.take(2000)
+        salvar()
+    }
+
+    fun pegarPremio(nivel: Int) {
+        premiosPegos = premiosPegos + nivel
+        salvar()
+    }
+
+    /** Entrega o turbo de cada nível de recompensa alcançado; devolve os avisos para mostrar. */
+    private fun conferirRecompensas(): List<String> {
+        val avisos = mutableListOf<String>()
+        while (nivel >= marcoPago + NIVEIS_POR_RECOMPENSA) {
+            marcoPago += NIVEIS_POR_RECOMPENSA
+            turbos += 1
+            val premio = premioDoNivel(marcoPago)
+            avisos += if (premio.isEmpty()) {
+                "Recompensa do nível $marcoPago: +1 turbo"
+            } else {
+                "Recompensa do nível $marcoPago: +1 turbo e o seu prêmio, $premio"
+            }
+        }
+        return avisos
+    }
+
+    /**
+     * Liga um turbo guardado. O dia inteiro passa a valer o dobro: o que já foi
+     * ganho hoje nas missões e nos blocos dobra na hora, e o que vier também.
+     */
+    fun usarTurbo(): Boolean {
+        val hoje = hojeTexto()
+        if (turbos <= 0 || turboLigado(hoje)) return false
+        turbos -= 1
+        turboEm = hoje
+        val jaGanho = feitos.filter { it.dia == hoje }.sumOf { it.xp } + blocosDe(hoje).size * Xp.BLOCO
+        // Os registros de hoje passam a guardar o valor dobrado, para desfazer certo depois.
+        feitos = feitos.map { if (it.dia == hoje) it.copy(xp = it.xp * 2) else it }
+        if (jaGanho > 0) {
+            ganhar(jaGanho, "Turbo ligado: o que você já fez hoje passou a valer o dobro")
+        } else {
+            ganho = Ganho(0, listOf("Turbo ligado: hoje tudo vale o dobro"), 0, System.currentTimeMillis())
+        }
+        salvar()
+        return true
+    }
+
+    /** Usado só pelo teste automático, que não chega ao nível 5 para ganhar um turbo. */
+    fun turboDeTeste() {
+        if (turbos == 0 && !turboLigado()) {
+            turbos = 1
+            salvar()
+        }
     }
 
     // ---------- ideias para depois ----------
