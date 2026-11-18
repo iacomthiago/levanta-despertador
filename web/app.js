@@ -487,7 +487,8 @@
       }
       h += '</div>' + e(16);
       if (!feita) {
-        var endereco = m.url && String(m.url).trim() ? m.url : N.URL_TREINO;
+        // Só endereços de site comuns; qualquer outra coisa cai no treino em casa.
+        var endereco = /^https?:\/\//i.test(String(m.url || '').trim()) ? String(m.url).trim() : N.URL_TREINO;
         if (!inicio) {
           h += '<a class="botao" href="' + esc(endereco) + '" target="_blank" rel="noopener" data-a="comecarTreino" data-id="' + m.id + '">Começar treino</a>';
         } else {
