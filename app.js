@@ -222,7 +222,15 @@
 
   function imagemDoPersonagem(v) {
     var propria = pega(CH.imagem);
-    return '<div class="heroi"><img src="' + (propria ? esc(propria) : 'carro.webp') + '" alt="Seu personagem" style="border-color:' + CORES_DO_RANK[v.rank] + '"></div>';
+    var borda = ' style="border-color:' + CORES_DO_RANK[v.rank] + '"';
+    if (propria) return '<div class="heroi"><img src="' + esc(propria) + '" alt="Seu personagem"' + borda + '></div>';
+    // A imagem que vem no app do tablet aparece para quem usa o tablet; conta só do site começa com as divisas.
+    var temTablet = Object.keys(doc.base).length > 0;
+    if (temTablet) return '<div class="heroi"><img src="carro.webp" alt="Seu personagem"' + borda + '></div>';
+    return (
+      '<div class="heroi"><div class="neutro"' + borda + ' role="img" aria-label="Seu personagem"><svg viewBox="26 22 56 62" aria-hidden="true">' +
+      '<path d="M35,76 L54,62 L73,76" stroke="#A77BFF"/><path d="M35,62 L54,48 L73,62" stroke="#D6C4FF"/><path d="M35,48 L54,34 L73,48" stroke="#F2F3F8"/></svg></div></div>'
+    );
   }
 
   function linhaDaSinc() {
