@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disciplina</title>
+<meta name="description" content="Missões do dia, experiência, nível e sequência. Um nível de cada vez.">
+<meta name="theme-color" content="#08070D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Disciplina">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest" id="manifesto">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<style>
+:root {
+  --fundo: #08070D; --cartao: #15121F; --cartao-alto: #1F1A2E; --roxo: #5D03F3; --sobre-roxo: #fff;
+  --lilas: #A77BFF; --ouro: #F6C768; --verde: #7EE0A1; --vermelho: #FF7A7A; --texto: #ECEBF1;
+  --suave: #A09DB3; --linha: #2A2540;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { background: var(--fundo); }
+body {
+  margin: 0; background: var(--fundo); color: var(--texto);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+#app {
+  max-width: 620px; margin: 0 auto;
+  padding: calc(20px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(28px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  min-height: 100vh;
+}
+h1 { font-size: 32px; margin: 0; line-height: 1.15; }
+h2 { font-size: 24px; margin: 0; }
+p { margin: 0; }
+a { color: var(--lilas); }
+button { font: inherit; color: inherit; cursor: pointer; }
+.suave { color: var(--suave); } .ouro { color: var(--ouro); } .verde { color: var(--verde); }
+.lilas { color: var(--lilas); } .vermelho { color: var(--vermelho); }
+.p13 { font-size: 13px; } .p14 { font-size: 14px; } .p15 { font-size: 15px; } .p17 { font-size: 17px; }
+.forte { font-weight: 700; } .meio { font-weight: 600; }
+.topo { display: flex; align-items: center; gap: 4px; }
+.topo .cresce { flex: 1; min-width: 0; }
+.icone {
+  width: 44px; height: 44px; border: 0; background: none; border-radius: 22px; display: grid; place-items: center; flex: none;
+}
+.icone:active { background: var(--cartao); }
+.icone svg { width: 24px; height: 24px; fill: var(--texto); }
+.cartao { background: var(--cartao); border-radius: 20px; padding: 18px; }
+.cartao.alto { background: var(--cartao-alto); }
+.cartao.toque { cursor: pointer; display: block; width: 100%; text-align: left; border: 0; }
+.rotulo { color: var(--suave); font-size: 13px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; }
+.secao { margin: 22px 0 8px 4px; }
+.e4 { height: 4px; } .e6 { height: 6px; } .e8 { height: 8px; } .e10 { height: 10px; } .e12 { height: 12px; }
+.e14 { height: 14px; } .e16 { height: 16px; } .e20 { height: 20px; }
+.botao {
+  display: block; width: 100%; min-height: 58px; border: 0; border-radius: 18px; background: var(--roxo); color: var(--sobre-roxo);
+  font-size: 18px; font-weight: 700; padding: 12px 16px; text-align: center; text-decoration: none;
+}
+.botao:disabled { background: var(--linha); color: var(--suave); cursor: default; }
+.botao.sec {
+  min-height: 52px; background: none; border: 1px solid var(--linha); color: var(--lilas); font-size: 16px; font-weight: 500;
+}
+.botao.sec:disabled { color: var(--suave); }
+.botao.pequeno { width: auto; min-height: 40px; border-radius: 14px; font-size: 15px; font-weight: 600; padding: 8px 16px; flex: none; }
+.botao.texto { width: auto; min-height: 36px; background: none; color: var(--suave); font-size: 15px; font-weight: 500; padding: 6px 10px; }
+.heroi img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 20px; border: 2px solid var(--suave); background: var(--cartao); }
+.nivel { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.nivel b { font-size: 34px; line-height: 1.1; }
+.nivel span { font-size: 14px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
+.barra { height: 12px; border-radius: 6px; background: var(--linha); overflow: hidden; }
+.barra i { display: block; height: 100%; }
+.linha { display: flex; align-items: center; gap: 8px; }
+.linha .cresce { flex: 1; min-width: 0; }
+.numero b { display: block; font-size: 28px; line-height: 1.1; }
+.numero span { color: var(--suave); font-size: 14px; }
+.missao { display: flex; align-items: center; gap: 8px; }
+.missao .hora { width: 96px; flex: none; }
+.missao .hora b { display: block; font-size: 26px; line-height: 1.15; }
+.missao .hora span { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--suave); }
+.missao .nome { font-size: 19px; font-weight: 600; overflow-wrap: anywhere; }
+.blocos { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+.bloco {
+  height: 76px; border-radius: 14px; border: 1px solid var(--linha); background: var(--cartao-alto); padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.bloco b { font-size: 22px; line-height: 1.1; }
+.bloco span { font-size: 12px; color: var(--suave); }
+.bloco.feito { background: var(--roxo); border-color: var(--lilas); color: var(--sobre-roxo); }
+.bloco.feito span { color: var(--sobre-roxo); }
+@media (max-width: 420px) { .bloco span { font-size: 10px; } .blocos { gap: 6px; } }
+input[type=text], input[type=password], input[type=time], input[type=number], textarea {
+  width: 100%; font: inherit; color: var(--texto); background: var(--cartao); border: 1px solid var(--linha); border-radius: 14px; padding: 14px;
+}
+textarea { min-height: 96px; resize: vertical; }
+input:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--lilas); outline-offset: 2px; }
+label.campo { display: block; font-size: 14px; color: var(--suave); margin: 0 0 6px 4px; }
+.chave { position: relative; width: 52px; height: 32px; flex: none; border: 0; border-radius: 16px; background: var(--linha); padding: 0; }
+.chave::after { content: ""; position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 12px; background: var(--suave); transition: transform .15s; }
+.chave.on { background: var(--roxo); }
+.chave.on::after { transform: translateX(20px); background: #fff; }
+.chave:disabled { opacity: .45; cursor: default; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--linha); background: none; border-radius: 12px; padding: 9px 14px; font-size: 15px; color: var(--texto); }
+.chip.on { background: #34128A; border-color: var(--lilas); color: #E6DAFF; font-weight: 600; }
+.mais-menos { display: flex; align-items: center; }
+.mais-menos button { width: 44px; height: 44px; border: 0; border-radius: 14px; background: var(--cartao-alto); font-size: 22px; }
+.mais-menos button:disabled { opacity: .4; cursor: default; }
+.mais-menos span { min-width: 84px; text-align: center; font-size: 17px; font-weight: 600; padding: 0 8px; }
+.qr { background: #fff; border-radius: 16px; padding: 10px; width: fit-content; margin: 0 auto; }
+.qr svg { display: block; max-width: 100%; height: auto; }
+ol.passos { margin: 0; padding-left: 22px; }
+ol.passos li { margin-bottom: 8px; }
+.rodape { text-align: center; font-size: 13px; color: var(--suave); padding: 4px; }
+</style>
+</head>
+<body>
+<div id="app"><p class="suave" style="padding:40px 0">Abrindo…</p></div>
+<noscript><p style="padding:20px">O Disciplina precisa de JavaScript ligado.</p></noscript>
+<script src="nucleo.js"></script>
+<script src="qr.js"></script>
+<script src="nuvem.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
