@@ -1,32 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sol nascendo sobre a linha do horizonte. Área segura do ícone: círculo de 66dp no centro. -->
+<!--
+    Três divisas subindo: cada uma é um degrau a mais, da roxa (embaixo) à prateada (em cima).
+    As cores vêm do carro da tela inicial: roxo neon, lilás e prata.
+    Área segura do ícone: círculo de 66dp no centro.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Meio sol -->
-    <path
-        android:fillColor="#F6C768"
-        android:pathData="M38,62 A16,16 0 0 1 70,62 Z" />
+    <group
+        android:pivotX="54"
+        android:pivotY="55"
+        android:scaleX="0.9"
+        android:scaleY="0.9"
+        android:translateY="-1">
 
-    <!-- Raios -->
-    <path
-        android:pathData="M54,32 L54,39 M33,41 L38,46 M75,41 L70,46 M26,58 L32,58 M82,58 L76,58"
-        android:strokeColor="#F6C768"
-        android:strokeLineCap="round"
-        android:strokeWidth="4" />
+        <path
+            android:pathData="M35,76 L54,62 L73,76"
+            android:strokeColor="#A77BFF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="6.5" />
 
-    <!-- Horizonte -->
-    <path
-        android:pathData="M29,67 L79,67"
-        android:strokeColor="#FFFFFF"
-        android:strokeLineCap="round"
-        android:strokeWidth="4" />
-    <path
-        android:pathData="M40,75 L68,75"
-        android:strokeColor="#C9B0FF"
-        android:strokeLineCap="round"
-        android:strokeWidth="4" />
+        <path
+            android:pathData="M35,62 L54,48 L73,62"
+            android:strokeColor="#D6C4FF"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="6.5" />
+
+        <path
+            android:pathData="M35,48 L54,34 L73,48"
+            android:strokeColor="#F2F3F8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="6.5" />
+    </group>
 </vector>

@@ -857,7 +857,7 @@ fun CartaoRecompensas(onAbrir: () -> Unit) {
             )
         }
         if (premio.isEmpty()) {
-            Text("Toque para escolher os seus prêmios.", fontSize = 14.sp, color = Cor.Lilas)
+            Text("Toque para escolher o prêmio deste nível.", fontSize = 14.sp, color = Cor.Lilas)
         }
     }
 }
@@ -914,8 +914,8 @@ fun TelaRecompensas(onVoltar: () -> Unit) {
 
         TituloSecao("Prêmios da vida real")
         Text(
-            "Escreva um prêmio por linha. O primeiro é o do nível $NIVEIS_POR_RECOMPENSA, " +
-                "o segundo o do nível ${NIVEIS_POR_RECOMPENSA * 2}, e assim por diante.",
+            "Os prêmios já vêm escolhidos; troque se quiser. É um por linha: o primeiro é o do " +
+                "nível $NIVEIS_POR_RECOMPENSA, o segundo o do nível ${NIVEIS_POR_RECOMPENSA * 2}, e assim por diante.",
             fontSize = 15.sp,
             color = Cor.Suave,
             modifier = Modifier.padding(horizontal = 4.dp),

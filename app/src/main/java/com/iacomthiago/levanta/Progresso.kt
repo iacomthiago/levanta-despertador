@@ -41,6 +41,19 @@ const val NIVEIS_POR_RECOMPENSA = 5
 /** A cada tantos dias seguidos de sequência sai mais um turbo. */
 const val DIAS_POR_TURBO = 7
 
+/**
+ * Prêmios da vida real que já vêm prontos, um por linha: nível 5, 10, 15...
+ * O Thiago pediu para não ter que escolher (18/11/2026) e disse que gosta de
+ * pizza e de lanche. Dá para trocar na tela de recompensas.
+ */
+const val PREMIOS_PADRAO =
+    "um lanche caprichado\n" +
+        "uma pizza\n" +
+        "uma noite de anime ou filme com pipoca\n" +
+        "um jantar fora, no lugar que você escolher\n" +
+        "um presente para você, algo que está querendo comprar\n" +
+        "um passeio de um dia inteiro"
+
 /** Quanto vale cada coisa. Estudo é o que mais rende: cada bloco conta, e bater a meta do dia cedo dá bônus. */
 object Xp {
     const val LEVANTAR = 30
@@ -148,7 +161,7 @@ object Jogo {
         private set
 
     /** Prêmios da vida real, um por linha: o primeiro é o do nível 5, o segundo o do 10, e assim por diante. */
-    var premios by mutableStateOf("")
+    var premios by mutableStateOf(PREMIOS_PADRAO)
         private set
 
     /** Níveis de recompensa cujo prêmio da vida real já foi pego. */
@@ -247,7 +260,7 @@ object Jogo {
             turbos = o.optInt("turbos", 0)
             turboEm = o.optString("turboEm", "")
             marcoPago = o.optInt("marcoPago", 0)
-            premios = o.optString("premios", "")
+            premios = o.optString("premios", "").ifBlank { PREMIOS_PADRAO }
             val pegos = o.optJSONArray("premiosPegos")
             premiosPegos = if (pegos == null) emptySet() else (0 until pegos.length()).map { pegos.optInt(it) }.toSet()
             val s = o.optJSONObject("semana")
@@ -677,7 +690,8 @@ object Jogo {
     fun proximoMarco(): Int = (nivel / NIVEIS_POR_RECOMPENSA + 1) * NIVEIS_POR_RECOMPENSA
 
     fun definirPremios(texto: String) {
-        premios = texto.take(2000)
+        // Lista apagada volta para os prêmios que vêm no app.
+        premios = texto.take(2000).ifBlank { PREMIOS_PADRAO }
         salvar()
     }
 

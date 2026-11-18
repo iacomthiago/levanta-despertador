@@ -19,7 +19,7 @@ Os alarmes que não são o de levantar tocam forte, mas **param com um toque**, 
 
 - **Experiência e nível:** cada nível pede 50 XP a mais que o anterior. As faixas de nível têm o nome das marchas (Partida, Primeira marcha, Segunda marcha...) e mudam a cor da borda da imagem do personagem.
 - **Sequência de dias:** cada missão tem a opção **Conta para a sequência**. Um dia em que todas as marcadas foram concluídas soma um; uma marcada sem concluir até o fim do dia zera. Às 19 h o app avisa se ainda falta alguma.
-- **Recompensas:** a cada 5 níveis sai uma recompensa: um **turbo** (um dia inteiro valendo o dobro de XP, ligado quando você quiser) e o **prêmio da vida real** que você mesmo escolheu para aquele nível. A cada 7 dias de sequência sai mais um turbo.
+- **Recompensas:** a cada 5 níveis sai uma recompensa: um **turbo** (um dia inteiro valendo o dobro de XP, ligado quando você quiser) e o **prêmio da vida real** daquele nível (a lista já vem pronta, de um lanche a um passeio, e dá para trocar). A cada 7 dias de sequência sai mais um turbo.
 - **Missão da semana:** de segunda a domingo, um desafio (treinar em 5 dias, bater a meta de estudo em 5 dias...) que vale 150 XP.
 - **Ideias para depois:** uma caixa para anotar a ideia que apareceu no meio de uma missão e voltar ao que estava fazendo.
 

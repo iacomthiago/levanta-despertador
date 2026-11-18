@@ -410,20 +410,15 @@ def missao_simples():
 
 
 def usar_turbo():
-    """Combina um prêmio, liga o turbo de teste e volta para a tela inicial."""
+    """Confere o prêmio que já vem no nível 5, liga o turbo de teste e volta para a tela inicial."""
     if not tocar_rolando("RECOMPENSAS"):
         return False
     if not esperar("1 turbo guardado", 15):
         return False
-    if not tocar_campo():
-        return False
-    digitar("Pizza")
-    fechar_teclado()
-    if not tocar_rolando("Guardar prêmios"):
-        return False
-    if not procurar("Prêmio: Pizza"):
+    if not procurar("Prêmio: um lanche caprichado"):
         return False
     shot("19-recompensas")
+    fechar_teclado()
     if not tocar_rolando("Usar um turbo hoje (XP em dobro)"):
         return False
     if not procurar("Turbo ligado hoje: tudo vale o dobro."):
