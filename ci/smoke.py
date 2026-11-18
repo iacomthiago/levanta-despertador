@@ -86,14 +86,15 @@ def dump():
                 }
             )
         # Em máquina lenta o emulador às vezes abre "<app do sistema> isn't
-        # responding" por cima de tudo. Não é do nosso app: toca em "Wait" e relê.
+        # responding" por cima de tudo. Não é do nosso app: fecha o app travado
+        # (o Android abre outro no lugar) e relê. Esperar não adianta: o aviso volta.
         if any("isn't responding" in n["text"] for n in nos):
-            esperar_botao = [n for n in nos if n["text"] == "Wait"]
+            fechar = [n for n in nos if n["text"] == "Close app"]
             quem = next(n["text"] for n in nos if "isn't responding" in n["text"])
-            if "Disciplina" not in quem and esperar_botao:
+            if "Disciplina" not in quem and fechar:
                 log(f"aviso do emulador fechado: {quem!r}")
-                sh(f"input tap {esperar_botao[-1]['cx']} {esperar_botao[-1]['cy']}")
-                time.sleep(2)
+                sh(f"input tap {fechar[-1]['cx']} {fechar[-1]['cy']}")
+                time.sleep(3)
                 continue
         return nos
     return []
@@ -565,6 +566,12 @@ def main():
     time.sleep(5)
     adb("wait-for-device")
     sh("settings put global auto_time 0")
+    # Avisos de "app não responde" de apps do sistema não devem cobrir a tela.
+    sh("settings put global hide_error_dialogs 1")
+    # O relógio só anda para a frente: voltar a hora deixou a tela inicial do
+    # Android travada em duas execuções. Se já passou das 10h, vale o dia seguinte.
+    if sh("date +%H%M").strip() >= "1000":
+        sh("date @$(( $(date +%s) + 86400 ))")
     acertar_relogio("1000")
 
     r = adb("install", "-r", "-g", apk, timeout=600)
