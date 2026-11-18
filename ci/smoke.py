@@ -78,6 +78,7 @@ def dump():
                     "cls": n.get("class", ""),
                     "cx": (x1 + x2) // 2,
                     "cy": (y1 + y2) // 2,
+                    "x1": x1,
                     "x2": x2,
                     "y1": y1,
                     "y2": y2,
@@ -108,10 +109,13 @@ def tocar(no):
 
 
 def rolar(nos, para_baixo=True):
-    """Arrasta a tela devagar, na metade de cima (longe do teclado), para não dar impulso."""
-    largura = max((n["x2"] for n in nos), default=1280)
+    """Arrasta a tela devagar, na metade de cima (longe do teclado), para não dar impulso.
+
+    O dedo vai rente à borda esquerda do conteúdo: no meio da tela fica o
+    relógio de escolher a hora, que puxaria o ponteiro em vez de rolar.
+    """
     altura = max((n["y2"] for n in nos), default=800)
-    x = largura // 2
+    x = min((n["x1"] for n in nos if n["text"] or n["desc"]), default=100) + 30
     de, ate = (int(altura * 0.46), int(altura * 0.16)) if para_baixo else (int(altura * 0.16), int(altura * 0.46))
     sh(f"input swipe {x} {de} {x} {ate} 700")
     time.sleep(0.8)
