@@ -67,6 +67,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .botao.pequeno { width: auto; min-height: 40px; border-radius: 14px; font-size: 15px; font-weight: 600; padding: 8px 16px; flex: none; }
 .botao.texto { width: auto; min-height: 36px; background: none; color: var(--suave); font-size: 15px; font-weight: 500; padding: 6px 10px; }
 .heroi img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 20px; border: 2px solid var(--suave); background: var(--cartao); }
+.heroi .neutro {
+  width: 100%; aspect-ratio: 16 / 9; border-radius: 20px; border: 2px solid var(--suave); display: grid; place-items: center;
+  background: linear-gradient(135deg, #7B2DFF, #2A0A78);
+}
+.heroi .neutro svg { height: 62%; fill: none; stroke-width: 6.5; stroke-linecap: round; stroke-linejoin: round; }
 .nivel { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .nivel b { font-size: 34px; line-height: 1.1; }
 .nivel span { font-size: 14px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; }
