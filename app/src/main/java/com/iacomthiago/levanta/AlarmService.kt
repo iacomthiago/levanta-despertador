@@ -47,6 +47,12 @@ class AlarmService : Service() {
         /** As missões que não são de levantar tocam por esse tempo e viram um lembrete. */
         const val MISSION_TIMEOUT_MS = 3 * 60_000L
 
+        /** Volume crescente: tempo do primeiro toque até o volume cheio. */
+        const val RAMP_MS = 60_000L
+
+        /** Volume crescente: fração do volume em que o som começa (bem baixinho). */
+        const val RAMP_START = 0.02f
+
         /** Tempo para responder "estou de pé" antes de o alarme voltar. */
         const val RECHECK_WINDOW_MS = 45_000L
 
@@ -395,8 +401,12 @@ class AlarmService : Service() {
     }
 
     private fun loudVolume(s: Session, now: Long): Float {
+        // Começa quase inaudível e sobe em curva exponencial, que é como o ouvido
+        // percebe o volume: assim a subida soa constante, sem susto no começo.
+        // (Uma reta, como era antes, já começava alta com o aparelho no máximo.)
         val ramp = if (Repo.config.gradualVolume && s.phase == Phase.RINGING) {
-            (0.15f + 0.85f * ((now - s.phaseSince) / 45_000f)).coerceIn(0.15f, 1f)
+            val t = ((now - s.phaseSince) / RAMP_MS.toFloat()).coerceIn(0f, 1f)
+            (RAMP_START * Math.pow((1f / RAMP_START).toDouble(), t.toDouble()).toFloat()).coerceIn(RAMP_START, 1f)
         } else {
             1f
         }
@@ -404,7 +414,7 @@ class AlarmService : Service() {
             // Silêncio curto para o microfone ouvir a afirmação.
             now < Repo.silenceUntil -> 0f
             // Trégua: enquanto a pessoa está resolvendo a missão o som fica baixo.
-            now < Repo.quietUntil -> 0.07f
+            now < Repo.quietUntil -> minOf(0.07f, ramp)
             else -> ramp
         }
     }

@@ -886,7 +886,7 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
                     Repo.updateConfig(c.copy(musicSeconds = it))
                 }
             }
-            LinhaChave("Volume crescente", "Começa baixo e chega ao máximo em 45 segundos.", c.gradualVolume) {
+            LinhaChave("Volume crescente", "Começa bem baixinho e vai subindo aos poucos, até o máximo em 1 minuto.", c.gradualVolume) {
                 Repo.updateConfig(c.copy(gradualVolume = it))
             }
             LinhaNumero(
