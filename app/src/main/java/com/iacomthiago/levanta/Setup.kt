@@ -164,10 +164,11 @@ fun Preparacao() {
                 false,
             ) { abrirAjuste(context, Settings.ACTION_MANAGE_OVERLAY_PERMISSION) }
         )
-        if (Repo.config.surpriseEnabled && !microfoneLiberado(context)) add(
+        val usaVoz = Repo.config.surpriseEnabled || Repo.alarms.any { it.type == Tipo.ESTUDO }
+        if (usaVoz && !microfoneLiberado(context)) add(
             Pendencia(
                 "Liberar o microfone",
-                "Opcional: deixa o tablet ouvir sua afirmação na missão surpresa.",
+                "Opcional: deixa o tablet ouvir sua afirmação e os resumos das metas de estudo.",
                 false,
             ) { pedirMicrofone.launch(Manifest.permission.RECORD_AUDIO) }
         )

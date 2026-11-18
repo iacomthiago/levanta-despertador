@@ -40,6 +40,9 @@ import kotlinx.coroutines.delay
  */
 class AlarmActivity : ComponentActivity() {
 
+    /** Verdadeiro entre o toque que para uma missão e a abertura da tela seguinte. */
+    private var saindo by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Repo.init(this)
@@ -60,14 +63,98 @@ class AlarmActivity : ComponentActivity() {
         setContent {
             LevantaTheme {
                 TelaDoAlarme(
+                    saindo = saindo,
                     claudeInstalado = claudeInstalado,
                     onFechar = {
                         Repo.lastResult = null
                         finish()
                     },
                     onAbrirClaude = { abrirClaude() },
+                    onMissao = { abrir -> atenderMissao(abrir) },
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        // Um alarme novo chegou com esta tela ainda aberta: ela volta a mostrar o que toca.
+        if (Repo.session != null) saindo = false
+    }
+
+    /**
+     * Missões que não são a de levantar param com um toque. Com [abrir], o
+     * toque já leva para a missão: conclui a simples, abre o treino no
+     * navegador ou mostra as metas de estudo.
+     */
+    private fun atenderMissao(abrir: Boolean) {
+        val sessao = Repo.session ?: return
+        if (sessao.type == Tipo.LEVANTAR) return
+        val alarme = Repo.alarms.firstOrNull { it.id == sessao.alarmId }
+        saindo = true
+        Repo.dropSession()
+        // Sem despertar em andamento, o serviço para o som e se encerra.
+        AlarmService.send(this, AlarmService.ACTION_RESUME)
+        if (alarme == null || !abrir) {
+            finish()
+            return
+        }
+        Lembrete.limpar(this, alarme.id)
+        val telaDoApp = MainActivity.intentPara(this, alarme.id)
+        when (alarme.type) {
+            Tipo.SIMPLES -> {
+                Jogo.concluir(alarme)
+                desbloquearEAbrir(MainActivity.intentPara(this, -1), null)
+            }
+
+            Tipo.TREINO -> {
+                Jogo.iniciarTreino(alarme.id)
+                Nav.pedido = alarme.id
+                val navegador = android.content.Intent(
+                    android.content.Intent.ACTION_VIEW,
+                    android.net.Uri.parse(alarme.endereco),
+                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                desbloquearEAbrir(navegador, telaDoApp)
+            }
+
+            else -> desbloquearEAbrir(telaDoApp, null)
+        }
+    }
+
+    /** Abre [destino], pedindo o desbloqueio antes se o tablet estiver bloqueado. */
+    private fun desbloquearEAbrir(destino: android.content.Intent, reserva: android.content.Intent?) {
+        val abrir = {
+            try {
+                startActivity(destino)
+            } catch (e: Exception) {
+                // sem navegador para abrir o endereço: fica na tela da missão
+                if (reserva != null) {
+                    try {
+                        startActivity(reserva)
+                    } catch (e2: Exception) {
+                        // nada a fazer
+                    }
+                }
+            }
+            finish()
+        }
+        val trava = getSystemService(KeyguardManager::class.java)
+        if (trava != null && trava.isKeyguardLocked) {
+            trava.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
+                override fun onDismissSucceeded() {
+                    abrir()
+                }
+
+                override fun onDismissCancelled() {
+                    finish()
+                }
+
+                override fun onDismissError() {
+                    finish()
+                }
+            })
+        } else {
+            abrir()
         }
     }
 
@@ -111,7 +198,13 @@ fun intentDoClaude(context: Context): android.content.Intent? =
     context.packageManager.getLaunchIntentForPackage("com.anthropic.claude")
 
 @Composable
-private fun TelaDoAlarme(claudeInstalado: Boolean, onFechar: () -> Unit, onAbrirClaude: () -> Unit) {
+private fun TelaDoAlarme(
+    saindo: Boolean,
+    claudeInstalado: Boolean,
+    onFechar: () -> Unit,
+    onAbrirClaude: () -> Unit,
+    onMissao: (Boolean) -> Unit,
+) {
     val context = LocalContext.current
     val sessao = Repo.session
     val resultado = Repo.lastResult
@@ -134,6 +227,10 @@ private fun TelaDoAlarme(claudeInstalado: Boolean, onFechar: () -> Unit, onAbrir
     }
 
     when {
+        sessao == null && saindo -> Pagina(centralizar = true) {
+            Text("Abrindo a missão…", fontSize = 22.sp, color = Cor.Suave, textAlign = TextAlign.Center)
+        }
+
         sessao == null && resultado != null ->
             TelaFim(resultado, claudeInstalado, onFechar, onAbrirClaude)
 
@@ -141,6 +238,17 @@ private fun TelaDoAlarme(claudeInstalado: Boolean, onFechar: () -> Unit, onAbrir
             // Aberta sem alarme ativo (por exemplo, por uma notificação antiga).
             LaunchedEffect(Unit) { onFechar() }
         }
+
+        sessao.type != Tipo.LEVANTAR ->
+            if (Phase.isLoud(fase)) {
+                TelaMissaoTocando(sessao, agora, onMissao)
+            } else {
+                // Missões não têm soneca nem checagem; qualquer outro estado é resto e sai de cena.
+                LaunchedEffect(Unit) {
+                    Repo.dropSession()
+                    onFechar()
+                }
+            }
 
         Phase.isLoud(fase) ->
             if (emMissao) {
@@ -219,6 +327,60 @@ private fun TelaTocando(sessao: Session, agora: Long, onComecar: () -> Unit, onS
             Espaco(18)
             Text(
                 "Este é um teste: soneca e checagem levam 20 segundos e nada entra no histórico.",
+                fontSize = 14.sp,
+                color = Cor.Suave,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/** Tela do alarme de uma missão de estudo, treino ou simples: para com um toque. */
+@Composable
+private fun TelaMissaoTocando(sessao: Session, agora: Long, onMissao: (Boolean) -> Unit) {
+    val alarme = Repo.alarms.firstOrNull { it.id == sessao.alarmId }
+    val botao: String
+    val detalhe: String
+    when (sessao.type) {
+        Tipo.TREINO -> {
+            botao = "Começar o treino agora"
+            detalhe = "Abre o treino de ${alarme?.minutes ?: 30} minutos no navegador. Na volta, toque em Concluí."
+        }
+
+        Tipo.ESTUDO -> {
+            val metas = Jogo.metasDe(hojeTexto())
+            botao = "Abrir as metas de hoje"
+            detalhe = when {
+                metas.isEmpty() -> "Escreva as metas de hoje e comece pela primeira."
+                else -> "${metas.count { it.feitaEm != 0L }} de ${metas.size} metas concluídas."
+            }
+        }
+
+        else -> {
+            botao = "Concluir agora (+${Xp.SIMPLES} XP)"
+            detalhe = "Um toque e está feita."
+        }
+    }
+
+    Pagina(centralizar = true) {
+        Text("HORA DA MISSÃO", color = Cor.Lilas, fontSize = 15.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+        Text(hhmm(agora), fontSize = 104.sp, fontWeight = FontWeight.Bold, lineHeight = 112.sp)
+        Text(
+            sessao.label.ifBlank { Tipo.nome(sessao.type) },
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
+        Espaco(8)
+        Text(detalhe, fontSize = 17.sp, color = Cor.Suave, textAlign = TextAlign.Center)
+        Espaco(28)
+        BotaoPrincipal(botao) { onMissao(true) }
+        Espaco(12)
+        BotaoSecundario("Parar o som e fazer depois") { onMissao(false) }
+        if (sessao.test) {
+            Espaco(18)
+            Text(
+                "Este é um teste do alarme desta missão.",
                 fontSize = 14.sp,
                 color = Cor.Suave,
                 textAlign = TextAlign.Center,
@@ -334,13 +496,21 @@ private fun TelaFim(
             }
             if (!resultado.test) {
                 Espaco(6)
-                val seguidos = Repo.streak()
+                val dias = Jogo.sequenciaAtual()
                 Text(
-                    if (seguidos == 1) "Sequência: 1 despertar" else "Sequência: $seguidos despertares",
+                    "+${Xp.LEVANTAR} XP · Nível ${Jogo.nivel}",
                     fontSize = 18.sp,
                     color = Cor.Lilas,
                     fontWeight = FontWeight.SemiBold,
                 )
+                if (dias > 0) {
+                    Text(
+                        if (dias == 1) "Sequência: 1 dia" else "Sequência: $dias dias",
+                        fontSize = 18.sp,
+                        color = Cor.Lilas,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
             }
             val prova = fraseDaProva(Repo.config.examDate)
             if (prova != null) {

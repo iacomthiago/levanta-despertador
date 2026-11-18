@@ -106,6 +106,6 @@ jobs:
           gh release create "v1.0.${{ github.run_number }}" levanta.apk \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Levanta 1.0.${{ github.run_number }}" \
+            --title "Disciplina 1.0.${{ github.run_number }}" \
             --notes "Instalador para Android. Baixe o arquivo levanta.apk no tablet e toque nele para instalar. Passo a passo no README." \
             --latest

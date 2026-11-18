@@ -1,6 +1,7 @@
 package com.iacomthiago.levanta
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -41,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,9 +51,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        /** Abre o app já na missão indicada; um número negativo abre a tela inicial. */
+        fun intentPara(context: Context, missaoId: Int): Intent =
+            Intent(context, MainActivity::class.java)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                )
+                .putExtra("missao", missaoId)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,6 +78,7 @@ class MainActivity : ComponentActivity() {
         }
         Scheduler.rescheduleAll(this)
         AlarmService.resumeIfNeeded(this)
+        lerPedido(intent)
         setContent {
             LevantaTheme {
                 AppPrincipal()
@@ -69,8 +86,21 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        lerPedido(intent)
+    }
+
+    /** O alarme de uma missão ou um lembrete pediu para abrir uma tela específica. */
+    private fun lerPedido(intent: Intent?) {
+        if (intent == null || !intent.hasExtra("missao")) return
+        Nav.pedido = intent.getIntExtra("missao", -1)
+        intent.removeExtra("missao")
+    }
+
     override fun onResume() {
         super.onResume()
+        Jogo.fecharDias()
         // Com o alarme tocando, abrir o app leva direto para a tela da missão.
         if (Phase.isActive(Repo.session?.phase)) {
             startActivity(Intent(this, AlarmActivity::class.java))
@@ -85,6 +115,27 @@ private sealed interface Tela {
     data object Historico : Tela
     data object Cadastro : Tela
     data class Treino(val passo: String) : Tela
+    data class Missao(val id: Int) : Tela
+    data object Estudo : Tela
+    data class Resumo(val metaId: Long) : Tela
+    data class Diario(val doEstudo: Boolean) : Tela
+    data class Ideias(val doEstudo: Boolean) : Tela
+}
+
+/** Para onde o botão de voltar leva a partir de cada tela. */
+private fun anterior(tela: Tela): Tela = when (tela) {
+    is Tela.Cadastro, is Tela.Treino -> Tela.Ajustes
+    is Tela.Resumo -> Tela.Estudo
+    is Tela.Diario -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
+    is Tela.Ideias -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
+    else -> Tela.Inicio
+}
+
+/** Tela de cada tipo de missão: estudo abre as metas, treino e simples têm tela própria, levantar abre a edição. */
+private fun telaDaMissao(alarme: Alarm): Tela = when (alarme.type) {
+    Tipo.ESTUDO -> Tela.Estudo
+    Tipo.TREINO, Tipo.SIMPLES -> Tela.Missao(alarme.id)
+    else -> Tela.Editar(alarme)
 }
 
 @Composable
@@ -92,14 +143,27 @@ private fun AppPrincipal() {
     var tela by remember { mutableStateOf<Tela>(Tela.Inicio) }
 
     BackHandler(enabled = tela != Tela.Inicio) {
-        tela = if (tela == Tela.Cadastro || tela is Tela.Treino) Tela.Ajustes else Tela.Inicio
+        tela = anterior(tela)
+    }
+
+    // O alarme de uma missão (ou um lembrete) pediu uma tela: vai direto para ela.
+    val pedido = Nav.pedido
+    LaunchedEffect(pedido) {
+        if (pedido != null) {
+            Nav.pedido = null
+            val alarme = Repo.alarms.firstOrNull { it.id == pedido }
+            tela = if (alarme == null || alarme.type == Tipo.LEVANTAR) Tela.Inicio else telaDaMissao(alarme)
+        }
     }
 
     when (val atual = tela) {
         is Tela.Inicio -> TelaInicio(
             onEditar = { tela = Tela.Editar(it) },
+            onAbrir = { tela = telaDaMissao(it) },
             onAjustes = { tela = Tela.Ajustes },
             onHistorico = { tela = Tela.Historico },
+            onDiario = { tela = Tela.Diario(doEstudo = false) },
+            onIdeias = { tela = Tela.Ideias(doEstudo = false) },
         )
 
         is Tela.Editar -> TelaEditar(atual.alarme, onVoltar = { tela = Tela.Inicio })
@@ -112,11 +176,42 @@ private fun AppPrincipal() {
         is Tela.Treino -> TelaTreino(atual.passo, onVoltar = { tela = Tela.Ajustes })
         is Tela.Historico -> TelaHistorico(onVoltar = { tela = Tela.Inicio })
         is Tela.Cadastro -> TelaCadastro(onVoltar = { tela = Tela.Ajustes })
+
+        is Tela.Missao -> {
+            val alarme = Repo.alarms.firstOrNull { it.id == atual.id }
+            if (alarme != null && alarme.type == Tipo.TREINO) {
+                TelaMissaoTreino(
+                    alarme,
+                    onVoltar = { tela = Tela.Inicio },
+                    onEditar = { tela = Tela.Editar(alarme) },
+                )
+            } else if (alarme != null && alarme.type == Tipo.SIMPLES) {
+                TelaMissaoSimples(
+                    alarme,
+                    onVoltar = { tela = Tela.Inicio },
+                    onEditar = { tela = Tela.Editar(alarme) },
+                )
+            } else {
+                // A missão foi apagada ou mudou de tipo: volta para o começo.
+                LaunchedEffect(atual) { tela = Tela.Inicio }
+            }
+        }
+
+        is Tela.Estudo -> TelaEstudo(
+            onVoltar = { tela = Tela.Inicio },
+            onResumir = { tela = Tela.Resumo(it) },
+            onDiario = { tela = Tela.Diario(doEstudo = true) },
+            onIdeias = { tela = Tela.Ideias(doEstudo = true) },
+        )
+
+        is Tela.Resumo -> TelaResumo(atual.metaId, onVoltar = { tela = Tela.Estudo })
+        is Tela.Diario -> TelaDiario(onVoltar = { tela = anterior(atual) })
+        is Tela.Ideias -> TelaIdeias(onVoltar = { tela = anterior(atual) })
     }
 }
 
 @Composable
-private fun Cabecalho(titulo: String, onVoltar: () -> Unit) {
+fun Cabecalho(titulo: String, onVoltar: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onVoltar) {
             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar", tint = Cor.Texto)
@@ -127,13 +222,19 @@ private fun Cabecalho(titulo: String, onVoltar: () -> Unit) {
     Espaco(6)
 }
 
-// ---------- início ----------
+/// ---------- início ----------
 
 @Composable
-private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHistorico: () -> Unit) {
+private fun TelaInicio(
+    onEditar: (Alarm?) -> Unit,
+    onAbrir: (Alarm) -> Unit,
+    onAjustes: () -> Unit,
+    onHistorico: () -> Unit,
+    onDiario: () -> Unit,
+    onIdeias: () -> Unit,
+) {
     val context = LocalContext.current
     val alarmes = Repo.alarms
-    val historico = Repo.history
     var avisoTeste by remember { mutableStateOf(false) }
 
     val agora by produceState(System.currentTimeMillis()) {
@@ -143,12 +244,19 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
         }
     }
     val proximo = remember(alarmes, agora) { Scheduler.nextAlarm(alarmes) }
+    val hoje = remember(agora) { LocalDate.now() }
+    // Virou o dia com o app aberto: fecha o dia anterior e confere a missão da semana.
+    LaunchedEffect(hoje, alarmes) {
+        Jogo.fecharDias()
+        Jogo.garantirSemana()
+    }
+    val deHoje = remember(alarmes, hoje) { Jogo.doDia(hoje) }
 
     Pagina {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text("Levanta", fontSize = 32.sp, fontWeight = FontWeight.Bold)
-                Text("Só para de tocar com a missão cumprida.", color = Cor.Suave, fontSize = 15.sp)
+                Text("Disciplina", fontSize = 32.sp, fontWeight = FontWeight.Bold)
+                Text("Missões do dia. Um nível de cada vez.", color = Cor.Suave, fontSize = 15.sp)
             }
             IconButton(onClick = onHistorico) {
                 Icon(Icons.Filled.DateRange, contentDescription = "Histórico", tint = Cor.Texto)
@@ -165,7 +273,7 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
             Cartao {
                 Text("Versão nova disponível: ${nova.nome}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas)
                 Text(
-                    "Você está na ${Atualizacao.nomeInstalado(context)}. Seus alarmes e ajustes continuam.",
+                    "Você está na ${Atualizacao.nomeInstalado(context)}. Suas missões, seu nível e seus ajustes continuam.",
                     fontSize = 14.sp,
                     color = Cor.Suave,
                 )
@@ -175,10 +283,35 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
             Espaco(12)
         }
 
-        Cartao(cor = Cor.CartaoAlto) {
-            Text("PRÓXIMO ALARME", color = Cor.Suave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
+        CartaoGanho()
+        CartaoHeroi()
+
+        Preparacao()
+
+        TituloSecao("Missões de hoje")
+        if (deHoje.isEmpty()) {
+            Text(
+                "Nenhuma missão para hoje. Crie a primeira em \"Nova missão\".",
+                color = Cor.Suave,
+                fontSize = 16.sp,
+                modifier = Modifier.padding(4.dp),
+            )
+        }
+        for (alarme in deHoje) {
+            LinhaMissaoDeHoje(alarme, agora, onAbrir = { onAbrir(alarme) })
+            Espaco(10)
+        }
+
+        if (Jogo.semana != null) {
+            Espaco(4)
+            CartaoSemana()
+        }
+
+        Espaco(14)
+        Cartao {
+            Text("PRÓXIMO DESPERTAR", color = Cor.Suave, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.2.sp)
             if (proximo != null) {
-                Text(hhmm(proximo.second), fontSize = 60.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas, lineHeight = 66.sp)
+                Text(hhmm(proximo.second), fontSize = 44.sp, fontWeight = FontWeight.Bold, color = Cor.Lilas, lineHeight = 50.sp)
                 Text("${diaCurto(proximo.second)} · ${daquiA(proximo.second)}", fontSize = 16.sp, color = Cor.Texto)
                 val deitar = remember(alarmes, agora, Repo.config) { Scheduler.bedtime() }
                 if (deitar != null) {
@@ -190,26 +323,13 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
                 }
             } else {
                 Espaco(6)
-                Text("Nenhum alarme ligado", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Espaco(14)
-            Row {
-                Numero(Repo.streak().toString(), "despertares seguidos", Modifier.weight(1f))
-                val media = remember(historico) { Repo.averageMinutesToGetUp() }
-                Numero(if (media == null) "–" else "$media min", "média para levantar", Modifier.weight(1f))
-            }
-            val prova = fraseDaProva(Repo.config.examDate)
-            if (prova != null) {
-                Espaco(12)
-                Text(prova, color = Cor.Ouro, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text("Nenhuma missão de levantar ligada", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
-        Preparacao()
-
-        TituloSecao("Alarmes")
+        TituloSecao("Todas as missões")
         if (alarmes.isEmpty()) {
-            Text("Você ainda não tem alarmes.", color = Cor.Suave, fontSize = 16.sp, modifier = Modifier.padding(4.dp))
+            Text("Você ainda não tem missões.", color = Cor.Suave, fontSize = 16.sp, modifier = Modifier.padding(4.dp))
         }
         for (alarme in alarmes) {
             LinhaAlarme(
@@ -223,7 +343,7 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
             Espaco(10)
         }
         Espaco(6)
-        BotaoPrincipal("Novo alarme") { onEditar(null) }
+        BotaoPrincipal("Nova missão") { onEditar(null) }
         Espaco(10)
         BotaoSecundario("Testar agora (toca em 5 segundos)") {
             Scheduler.scheduleTest(context, 5)
@@ -232,12 +352,17 @@ private fun TelaInicio(onEditar: (Alarm?) -> Unit, onAjustes: () -> Unit, onHist
         if (avisoTeste) {
             Espaco(8)
             Text(
-                "Vai tocar em 5 segundos. Bloqueie a tela para ver o alarme abrir sozinho.",
+                "O despertador vai tocar em 5 segundos. Bloqueie a tela para ver o alarme abrir sozinho.",
                 color = Cor.Verde,
                 fontSize = 15.sp,
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
         }
+
+        TituloSecao("Mais")
+        BotaoSecundario("Diário de estudo", onClick = onDiario)
+        Espaco(10)
+        BotaoSecundario("Ideias para depois", onClick = onIdeias)
         Espaco(20)
     }
 }
@@ -258,13 +383,14 @@ private fun BotaoDeAtualizar() {
 }
 
 @Composable
-private fun Numero(valor: String, legenda: String, modifier: Modifier = Modifier) {
+fun Numero(valor: String, legenda: String, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
         Text(valor, fontSize = 26.sp, fontWeight = FontWeight.Bold)
         Text(legenda, fontSize = 13.sp, color = Cor.Suave)
     }
 }
 
+/** Linha da lista completa: liga, desliga e abre a edição. */
 @Composable
 private fun LinhaAlarme(alarme: Alarm, onAbrir: () -> Unit, onLigar: (Boolean) -> Unit) {
     Cartao(modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable(onClick = onAbrir)) {
@@ -272,11 +398,16 @@ private fun LinhaAlarme(alarme: Alarm, onAbrir: () -> Unit, onLigar: (Boolean) -
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     hhmm(alarme.hour, alarme.minute),
-                    fontSize = 40.sp,
+                    fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (alarme.enabled) Cor.Texto else Cor.Suave,
                 )
-                val detalhe = listOf(resumoDias(alarme.days), alarme.label).filter { it.isNotBlank() }.joinToString(" · ")
+                val detalhe = listOf(
+                    Tipo.nome(alarme.type),
+                    alarme.label.takeIf { it != Tipo.nome(alarme.type) }.orEmpty(),
+                    resumoDias(alarme.days),
+                    if (alarme.toca) "" else "sem toque",
+                ).filter { it.isNotBlank() }.joinToString(" · ")
                 Text(detalhe, fontSize = 15.sp, color = Cor.Suave)
             }
             Switch(checked = alarme.enabled, onCheckedChange = onLigar)
@@ -284,7 +415,22 @@ private fun LinhaAlarme(alarme: Alarm, onAbrir: () -> Unit, onLigar: (Boolean) -
     }
 }
 
-// ---------- novo alarme / editar ----------
+// ---------- nova missão / editar ----------
+
+private fun descricaoDoTipo(tipo: String): String = when (tipo) {
+    Tipo.ESTUDO ->
+        "Lista de metas do dia. Cada meta se conclui com um resumo falado e vale +${Xp.META} XP. " +
+            "Fechar todas antes da hora combinada dá bônus."
+
+    Tipo.TREINO ->
+        "Na hora, abre o seu treino no navegador. Na volta, você toca em Concluí. Vale +${Xp.TREINO} XP."
+
+    Tipo.SIMPLES ->
+        "Tarefa rápida, concluída com um toque. Vale +${Xp.SIMPLES} XP."
+
+    else ->
+        "O despertador: toca e só para com a missão cumprida. Vale +${Xp.LEVANTAR} XP."
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -295,13 +441,52 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
         initialMinute = original?.minute ?: 30,
         is24Hour = true,
     )
+    // A primeira missão de um aparelho novo é a de levantar; depois, o mais comum é uma simples.
+    var tipo by remember {
+        mutableStateOf(
+            original?.type ?: if (Repo.alarms.none { it.type == Tipo.LEVANTAR }) Tipo.LEVANTAR else Tipo.SIMPLES
+        )
+    }
     var dias by remember { mutableStateOf(original?.days?.takeIf { it.isNotEmpty() } ?: (1..7).toSet()) }
     var nome by remember { mutableStateOf(original?.label ?: "") }
+    var conta by remember { mutableStateOf(original?.counts ?: true) }
+    var toca by remember { mutableStateOf(original?.rings ?: true) }
+    var minutos by remember { mutableStateOf(original?.minutes ?: 30) }
+    var minimo by remember { mutableStateOf(original?.minPercent ?: 60) }
+    var endereco by remember { mutableStateOf(original?.url ?: "") }
+    var avisoTeste by remember { mutableStateOf(false) }
 
     Pagina {
-        Cabecalho(if (original == null) "Novo alarme" else "Editar alarme", onVoltar)
+        Cabecalho(if (original == null) "Nova missão" else "Editar missão", onVoltar)
+
+        TituloSecao("Tipo de missão")
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (opcao in Tipo.todos) {
+                FilterChip(
+                    selected = tipo == opcao,
+                    onClick = { tipo = opcao },
+                    label = { Text(Tipo.nome(opcao), fontSize = 15.sp) },
+                )
+            }
+        }
+        Text(
+            descricaoDoTipo(tipo),
+            fontSize = 14.sp,
+            lineHeight = 19.sp,
+            color = Cor.Suave,
+            modifier = Modifier.padding(top = 4.dp, start = 4.dp),
+        )
+
+        Espaco(10)
         Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             TimePicker(state = relogio, layoutType = TimePickerLayoutType.Vertical)
+        }
+        if (tipo != Tipo.LEVANTAR) {
+            LinhaChave(
+                "Tocar alarme neste horário",
+                "Toca forte e para com um toque, que já abre a missão. Desligado, a missão só aparece na lista do dia.",
+                toca,
+            ) { toca = it }
         }
 
         TituloSecao("Dias da semana")
@@ -315,17 +500,58 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
             }
         }
 
-        TituloSecao("Nome (opcional)")
+        TituloSecao(if (tipo == Tipo.SIMPLES) "Nome da missão" else "Nome (opcional)")
         OutlinedTextField(
             value = nome,
             onValueChange = { nome = it.take(40) },
             singleLine = true,
-            placeholder = { Text("Ex.: Estudar antes do trabalho") },
+            placeholder = {
+                Text(
+                    when (tipo) {
+                        Tipo.SIMPLES -> "Ex.: Beber água, arrumar a mesa"
+                        Tipo.TREINO -> "Ex.: Treino em casa"
+                        Tipo.ESTUDO -> "Ex.: Estudo para a prova"
+                        else -> "Ex.: Estudar antes do trabalho"
+                    }
+                )
+            },
             modifier = Modifier.fillMaxWidth(),
         )
 
+        if (tipo == Tipo.TREINO) {
+            TituloSecao("Treino")
+            Cartao {
+                LinhaNumero("Duração prevista", minutos, 10..120, passo = 5, rotulo = { "$it min" }) { minutos = it }
+                LinhaNumero("Mínimo para concluir", minimo, 0..100, passo = 10, rotulo = { "$it%" }) { minimo = it }
+                Text(
+                    if (minimo == 0) "O botão Concluí libera assim que você começa."
+                    else "O botão Concluí libera ${minutos * minimo / 100} min depois de você tocar em começar.",
+                    fontSize = 13.sp,
+                    color = Cor.Suave,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Espaco(8)
+                OutlinedTextField(
+                    value = endereco,
+                    onValueChange = { endereco = it.take(200).trim() },
+                    singleLine = true,
+                    label = { Text("Endereço que abre (vazio usa o seu treino em casa)") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+
+        Espaco(10)
+        Cartao {
+            LinhaChave(
+                "Conta para a sequência",
+                "Se esta missão ficar sem concluir até o fim do dia, a sequência de dias zera.",
+                conta,
+            ) { conta = it }
+        }
+
         Espaco(24)
-        BotaoPrincipal("Salvar alarme") {
+        BotaoPrincipal("Salvar missão") {
             Repo.upsertAlarm(
                 Alarm(
                     id = original?.id ?: Repo.nextAlarmId(),
@@ -334,14 +560,38 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
                     days = dias.ifEmpty { (1..7).toSet() },
                     enabled = true,
                     label = nome.trim(),
+                    type = tipo,
+                    counts = conta,
+                    rings = toca,
+                    minutes = minutos,
+                    minPercent = minimo,
+                    url = endereco.trim(),
+                    createdAt = original?.createdAt?.takeIf { it > 0L } ?: System.currentTimeMillis(),
                 )
             )
             Scheduler.rescheduleAll(context)
+            Jogo.garantirSemana()
             onVoltar()
+        }
+        if (original != null && original.type != Tipo.LEVANTAR) {
+            Espaco(10)
+            BotaoSecundario("Testar o alarme desta missão (toca em 5 segundos)") {
+                Scheduler.scheduleTest(context, 5, original.id)
+                avisoTeste = true
+            }
+            if (avisoTeste) {
+                Espaco(8)
+                Text(
+                    "Vai tocar em 5 segundos, do jeito que toca no horário.",
+                    color = Cor.Verde,
+                    fontSize = 15.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
         }
         if (original != null) {
             Espaco(10)
-            BotaoSecundario("Excluir alarme") {
+            BotaoSecundario("Excluir missão") {
                 Scheduler.cancel(context, original.id)
                 Repo.deleteAlarm(original.id)
                 onVoltar()
@@ -351,7 +601,7 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
     }
 }
 
-// ---------- ajustes ----------
+/ ---------- ajustes ----------
 
 @Composable
 private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar: (String) -> Unit) {
@@ -370,10 +620,64 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
         if (cameraLiberada(context)) onCadastrar() else pedirCamera.launch(Manifest.permission.CAMERA)
     }
 
+    val escopo = rememberCoroutineScope()
+    var avisoImagem by remember { mutableStateOf("") }
+    val escolherImagem = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            avisoImagem = "Copiando a imagem…"
+            escopo.launch {
+                val ok = withContext(Dispatchers.IO) { Jogo.copiarImagem(uri) }
+                if (ok) Jogo.definirImagem(true)
+                avisoImagem = if (ok) "" else "Não consegui abrir essa imagem. Tente outra."
+            }
+        }
+    }
+
     Pagina {
         Cabecalho("Ajustes", onVoltar)
 
-        TituloSecao("Missões para desligar")
+        TituloSecao("Seu personagem")
+        Cartao {
+            ImagemDoPersonagem()
+            Espaco(12)
+            BotaoSecundario("Escolher imagem da galeria") { escolherImagem.launch("image/*") }
+            if (Jogo.imagem != 0L) {
+                Espaco(8)
+                BotaoSecundario("Voltar para a imagem que vem no app") { Jogo.definirImagem(false) }
+            }
+            Text(
+                avisoImagem.ifEmpty { "A imagem escolhida fica só neste tablet. A borda muda de cor conforme a sua faixa de nível." },
+                fontSize = 13.sp,
+                color = if (avisoImagem.isEmpty()) Cor.Suave else Cor.Ouro,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+
+        TituloSecao("Progresso e estudo")
+        Cartao {
+            LinhaNumero("Bônus de estudo até", c.studyBonusHour, 8..22, rotulo = { "$it h" }) {
+                Repo.updateConfig(c.copy(studyBonusHour = it))
+            }
+            LinhaNumero("Palavras no resumo da meta", c.minWords, 5..60, passo = 5) {
+                Repo.updateConfig(c.copy(minWords = it))
+            }
+            LinhaChave(
+                "Avisar se a sequência está em risco",
+                "Às ${Scheduler.STREAK_WARNING_HOUR} h, se ainda houver missão do dia que conta para a sequência.",
+                c.streakWarning,
+            ) {
+                Repo.updateConfig(c.copy(streakWarning = it))
+                Scheduler.rescheduleAll(context)
+            }
+            Text(
+                "Nível ${Jogo.nivel} · ${Jogo.xp} XP · recorde de ${Jogo.recorde} dias seguidos.",
+                fontSize = 13.sp,
+                color = Cor.Suave,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+
+        TituloSecao("Missões para desligar o despertador")
         Cartao {
             LinhaChave(
                 "Questões do concurso",

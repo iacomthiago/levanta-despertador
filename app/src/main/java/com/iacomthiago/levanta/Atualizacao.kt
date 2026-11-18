@@ -19,7 +19,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Atualização por dentro do app. O Levanta não vem da loja, então ele mesmo
+ * Atualização por dentro do app. O Disciplina não vem da loja, então ele mesmo
  * pergunta ao GitHub qual é a versão mais recente, baixa o instalador e abre
  * a tela de instalação do Android. O toque final em "Instalar" é da pessoa:
  * o sistema não deixa um app de fora da loja se instalar em silêncio.
@@ -155,7 +155,7 @@ object Atualizacao {
                         .setDataAndType(uri, "application/vnd.android.package-archive")
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
-                aviso = "Toque em Atualizar na tela do Android. Se ele pedir, permita instalar a partir do Levanta."
+                aviso = "Toque em Atualizar na tela do Android. Se ele pedir, permita instalar a partir do Disciplina."
             } catch (e: Exception) {
                 Log.w(TAG, "Não abriu o instalador", e)
                 aviso = "Não consegui abrir o instalador do Android."

@@ -3,8 +3,14 @@
 
 Instala o APK, dispara o alarme de teste com a tela apagada e cumpre o ciclo
 inteiro: questões -> contas -> frase -> espera -> checagem -> bom dia. Depois
-confere a recaída e a troca da música pelo bipe. Salva capturas de tela em
-ci-out/ e falha se o app travar ou alguma etapa não aparecer.
+confere a recaída e a troca da música pelo bipe. Em seguida usa as telas do
+Disciplina: metas de estudo com resumo digitado, diário, missão simples com o
+alarme que para com um toque, treino, ideias e a experiência somada. Por fim,
+os avisos de hora de dormir. Salva capturas de tela em ci-out/ e falha se o
+app travar ou alguma etapa não aparecer.
+
+O relógio do emulador é acertado para 10:00 logo no começo: assim nenhuma
+missão com horário toca no meio do teste e o bônus de estudo é previsível.
 
 A missão surpresa (falar ou memória) fica desligada aqui: o emulador não fala
 nem enxerga a sequência que acende.
@@ -69,8 +75,12 @@ def dump():
                 {
                     "text": n.get("text", ""),
                     "desc": n.get("content-desc", ""),
+                    "cls": n.get("class", ""),
                     "cx": (x1 + x2) // 2,
                     "cy": (y1 + y2) // 2,
+                    "x2": x2,
+                    "y1": y1,
+                    "y2": y2,
                     "enabled": n.get("enabled") == "true",
                 }
             )
@@ -87,8 +97,112 @@ def achar(nos, rotulo):
     return candidatos[-1] if candidatos else None
 
 
+def achar_contendo(nos, trecho):
+    """Como achar(), mas basta o texto conter o trecho (linhas clicáveis juntam os textos de dentro)."""
+    candidatos = [n for n in nos if (trecho in n["text"] or trecho in n["desc"]) and n["enabled"]]
+    return candidatos[-1] if candidatos else None
+
+
 def tocar(no):
     sh(f"input tap {no['cx']} {no['cy']}")
+
+
+def rolar(nos, para_baixo=True):
+    """Arrasta a tela devagar, na metade de cima (longe do teclado), para não dar impulso."""
+    largura = max((n["x2"] for n in nos), default=1280)
+    altura = max((n["y2"] for n in nos), default=800)
+    x = largura // 2
+    de, ate = (int(altura * 0.46), int(altura * 0.16)) if para_baixo else (int(altura * 0.16), int(altura * 0.46))
+    sh(f"input swipe {x} {de} {x} {ate} 700")
+    time.sleep(0.8)
+
+
+def procurar(rotulo, contendo=False, voltas=9):
+    """Procura um elemento rolando a tela: primeiro para baixo, depois de volta para cima."""
+    ultimos = []
+    for para_baixo in (True, False):
+        anterior = None
+        for _ in range(voltas):
+            nos = dump()
+            ultimos = textos(nos)
+            no = achar_contendo(nos, rotulo) if contendo else achar(nos, rotulo)
+            if no and no["y2"] - no["y1"] >= 24:
+                return no
+            assinatura = [(n["text"], n["cy"]) for n in nos]
+            if assinatura == anterior:
+                break  # chegou ao fim da tela
+            anterior = assinatura
+            rolar(nos, para_baixo)
+    problemas.append(f"Não achei rolando: {rotulo!r}. Na tela: {ultimos}")
+    log(problemas[-1])
+    return None
+
+
+def tocar_rolando(rotulo, contendo=False):
+    no = procurar(rotulo, contendo)
+    if no:
+        tocar(no)
+        time.sleep(1.5)
+    return no is not None
+
+
+def fechar_teclado():
+    """Se o teclado da tela estiver aberto, fecha (o voltar, nesse caso, só fecha o teclado)."""
+    if "mInputShown=true" in sh("dumpsys input_method | grep -E 'mInputShown=' | head -3"):
+        sh("input keyevent 4")
+        time.sleep(1.0)
+
+
+def tocar_campo():
+    """Toca no campo de texto da tela para poder digitar."""
+    for _ in range(5):
+        campos = [n for n in dump() if n["cls"].endswith("EditText")]
+        if campos:
+            tocar(campos[-1])
+            time.sleep(1.0)
+            return True
+        time.sleep(1)
+    problemas.append(f"Não achei campo de texto. Na tela: {textos(dump())}")
+    log(problemas[-1])
+    return False
+
+
+def digitar(texto):
+    sh("input text '" + texto.replace(" ", "%s") + "'", timeout=180)
+    time.sleep(0.8)
+
+
+def ler_total():
+    """Lê o total de experiência no cartão do personagem, no alto da tela inicial."""
+    for _ in range(8):
+        nos = dump()
+        for t in textos(nos):
+            m = re.fullmatch(r"Total: (\d+) XP", t)
+            if m:
+                return int(m.group(1))
+        rolar(nos, para_baixo=False)
+    problemas.append(f"Não achei o total de XP na tela inicial. Na tela: {textos(dump())}")
+    log(problemas[-1])
+    return None
+
+
+def conferir_ganho(antes, esperados, o_que):
+    """Confere quanto a experiência subiu. A missão da semana pode somar 150 de bônus junto."""
+    depois = ler_total()
+    if antes is None or depois is None:
+        return depois
+    ganho = depois - antes
+    log(f"XP depois de {o_que}: {antes} -> {depois}")
+    if ganho not in esperados and ganho - 150 not in esperados:
+        problemas.append(f"XP depois de {o_que}: era {antes}, ficou {depois}; esperava +{esperados}")
+    return depois
+
+
+def acertar_relogio(hhmm, segundos="00"):
+    dia = sh("date +%m%d").strip()
+    ano = sh("date +%Y").strip()
+    sh(f"date {dia}{hhmm}{ano}.{segundos}")
+    log("relógio do emulador: " + sh("date").strip())
 
 
 def esperar(rotulo, limite=30):
@@ -181,33 +295,208 @@ def cumprir_missoes(prefixo):
     return False
 
 
+def voltar_para_o_app():
+    """Traz o app de volta para a frente, na tela em que ele estava."""
+    sh(f"am start -n {PKG}/.MainActivity")
+    time.sleep(3)
+
+
+def estudar():
+    """Escreve duas metas e conclui cada uma com um resumo digitado (o emulador não fala)."""
+    if not tocar_rolando("Escreva as metas de hoje", contendo=True):
+        return False
+    if not esperar("Nenhuma ainda", 15):
+        return False
+    shot("15-estudo-vazio")
+    if not tocar_campo():
+        return False
+    digitar("Ler artigo 37")
+    sh("input keyevent 66")
+    digitar("Resolver dez questoes")
+    fechar_teclado()
+    if not tocar_rolando("Adicionar metas"):
+        return False
+    if not esperar("0 de 2", 15):
+        return False
+    shot("16-estudo-metas")
+
+    resumo = " ".join(["estudei", "o", "artigo", "e", "entendi", "a", "regra"] * 3)  # 21 palavras
+    for feitas in (1, 2):
+        if not tocar_rolando("Concluir meta"):
+            return False
+        if not esperar("META", 15):
+            return False
+        if not tocar_campo():
+            return False
+        digitar(resumo)
+        fechar_teclado()
+        if feitas == 1:
+            shot("17-resumo-da-meta")
+        if not tocar_rolando("Guardar e concluir (+30 XP)"):
+            return False
+        if not esperar(f"{feitas} de 2", 15):
+            return False
+    if not esperar("Dia de estudo fechado.", 10):
+        return False
+    shot("18-estudo-fechado")
+
+    if not tocar_rolando("Diário de estudo"):
+        return False
+    if not esperar("Copiar o diário inteiro", 15):
+        return False
+    shot("19-diario")
+    sh("input keyevent 4")  # volta para o estudo
+    time.sleep(1.5)
+    sh("input keyevent 4")  # volta para a tela inicial
+    time.sleep(1.5)
+    return True
+
+
+def missao_simples():
+    """Cria uma missão simples, faz o alarme dela tocar e conclui com um toque na tela do alarme."""
+    if not tocar_rolando("Nova missão"):
+        return False
+    if not tocar_em("Simples", 15):
+        return False
+    if not tocar_rolando("Salvar missão"):
+        return False
+    time.sleep(1.5)
+    # Na lista de todas as missões, tocar na linha abre a edição, onde fica o teste do alarme.
+    if not tocar_rolando("Simples · Todos os dias", contendo=True):
+        return False
+    if not tocar_rolando("Testar o alarme desta missão (toca em 5 segundos)"):
+        return False
+    time.sleep(10)
+    topo = sh("dumpsys activity activities | grep -E 'ResumedActivity'").strip()
+    som = sh("dumpsys audio | grep -i 'USAGE_ALARM' | grep -i 'state:started' | head -3").strip()
+    log(f"missão tocando. topo: {topo} | áudio: {som}")
+    shot("20-missao-tocando")
+    if "AlarmActivity" not in topo:
+        problemas.append("A tela do alarme da missão não abriu sozinha")
+    if not som:
+        problemas.append("O alarme da missão não está tocando")
+    if not esperar("HORA DA MISSÃO", 15):
+        return False
+    if not tocar_em("Concluir agora (+10 XP)", 15):
+        return False
+    time.sleep(3)
+    som = sh("dumpsys audio | grep -i 'USAGE_ALARM' | grep -i 'state:started' | head -3").strip()
+    if som:
+        problemas.append(f"O alarme da missão continuou tocando depois do toque: {som!r}")
+    return True
+
+
+def treinar():
+    """Zera o tempo mínimo do treino, começa (abre o navegador), volta e conclui."""
+    if not tocar_rolando("TREINO", contendo=True):
+        return False
+    if not esperar("Pronto para começar?", 15):
+        return False
+    shot("21-treino")
+    if not tocar_rolando("Editar esta missão"):
+        return False
+    if not procurar("Mínimo para concluir"):
+        return False
+    for _ in range(8):
+        nos = dump()
+        rotulo = achar(nos, "Mínimo para concluir")
+        if not rotulo:
+            break
+        menos = [n for n in nos if n["text"] == "−" and n["enabled"] and abs(n["cy"] - rotulo["cy"]) < 70]
+        if not menos:
+            break
+        tocar(menos[0])
+        time.sleep(0.5)
+    if "0%" not in textos(dump()):
+        problemas.append(f"Não consegui zerar o mínimo do treino. Na tela: {textos(dump())}")
+        return False
+    if not tocar_rolando("Salvar missão"):
+        return False
+    time.sleep(1.5)
+    if not tocar_rolando("TREINO", contendo=True):
+        return False
+    if not tocar_em("Começar treino", 15):
+        return False
+    time.sleep(5)
+    topo = sh("dumpsys activity activities | grep -E 'ResumedActivity'").strip()
+    log(f"depois de começar o treino, no topo: {topo}")
+    voltar_para_o_app()
+    # O navegador do emulador fica fechado para não abrir avisos por cima do teste.
+    m = re.search(r" ([\w.]+)/", topo)
+    if m and m.group(1) != PKG and re.search(r"chrome|browser|webview", m.group(1), re.I):
+        sh(f"am force-stop {m.group(1)}")
+    if not esperar("Já pode concluir.", 15):
+        return False
+    if not tocar_em("Concluí (+40 XP)", 15):
+        return False
+    if not esperar("Treino concluído hoje.", 15):
+        return False
+    shot("22-treino-concluido")
+    sh("input keyevent 4")
+    time.sleep(1.5)
+    return True
+
+
+def anotar_ideia():
+    if not tocar_rolando("Ideias para depois"):
+        return False
+    if not tocar_campo():
+        return False
+    digitar("Ideia de teste")
+    fechar_teclado()
+    if not tocar_rolando("Guardar ideia"):
+        return False
+    if not esperar("GUARDADAS", 15):
+        return False
+    shot("23-ideias")
+    sh("input keyevent 4")
+    time.sleep(1.5)
+    return True
+
+
+def conferir_disciplina():
+    """Usa as telas novas e confere a experiência somada a cada missão."""
+    tocar_em("Fechar", 10)
+    voltar_para_o_app()
+    total = ler_total()
+    if total is None:
+        return False
+
+    if not estudar():
+        return False
+    # Duas metas de 30; fechadas antes das 14 h, mais 50 de bônus.
+    total = conferir_ganho(total, (110, 60), "o estudo")
+
+    if not missao_simples():
+        return False
+    total = conferir_ganho(total, (10,), "a missão simples")
+
+    if not treinar():
+        return False
+    total = conferir_ganho(total, (40,), "o treino")
+    shot("24-inicio-com-progresso")
+
+    return anotar_ideia()
+
+
 def avisos_de_dormir():
     return sh("dumpsys notification --noredact | grep -E 'android.title=.*Hora de dormir' | head -5").strip()
 
 
 def conferir_hora_de_dormir():
     """Adianta o relógio do emulador e confere os dois avisos de dormir."""
-    tocar_em("Fechar", 10)
-    adb("root")
-    time.sleep(5)
-    adb("wait-for-device")
-    sh("settings put global auto_time 0")
-    dia = sh("date +%m%d").strip()
-    ano = sh("date +%Y").strip()
-    # 21:58:00. Com o alarme padrão das 06:30 e 8 h de sono, deitar é às 22:30.
-    sh(f"date {dia}2158{ano}.00")
-    log("relógio do emulador: " + sh("date").strip())
+    # 21:58:00. Com a missão de levantar padrão das 06:30 e 8 h de sono, deitar é às 22:30.
+    acertar_relogio("2158")
     sh(f"am start -n {PKG}/.MainActivity")
     time.sleep(3)
-    if not tocar_em("Novo alarme"):
+    if not tocar_rolando("Nova missão"):
         return
-    if not tocar_em("Salvar alarme"):
+    # Ainda não há missão de levantar, então a tela já abre nesse tipo.
+    if not tocar_rolando("Salvar missão"):
         return
     time.sleep(2)
-    ts = textos(dump())
-    shot("15-hora-de-dormir")
-    if not any("deite até 22:30" in t for t in ts):
-        problemas.append(f"A tela inicial não mostra a hora de deitar: {ts}")
+    procurar("deite até 22:30", contendo=True)
+    shot("25-hora-de-dormir")
 
     fim = time.time() + 170
     achou = ""
@@ -218,7 +507,7 @@ def conferir_hora_de_dormir():
     if "em 30 minutos" not in achou:
         problemas.append(f"O aviso de dormir de meia hora antes não apareceu: {achou!r}")
 
-    sh(f"date {dia}2229{ano}.40")
+    acertar_relogio("2229", "40")
     fim = time.time() + 90
     achou = ""
     while time.time() < fim and "(Hora de dormir)" not in achou:
@@ -232,6 +521,13 @@ def conferir_hora_de_dormir():
 def main():
     apk = sys.argv[1]
     os.makedirs(OUT, exist_ok=True)
+
+    # Relógio fixo desde o começo (precisa de root, que o emulador de teste permite).
+    adb("root")
+    time.sleep(5)
+    adb("wait-for-device")
+    sh("settings put global auto_time 0")
+    acertar_relogio("1000")
 
     r = adb("install", "-r", "-g", apk, timeout=600)
     log("install: " + (r.stdout + r.stderr).decode("utf-8", "replace").strip())
@@ -251,14 +547,14 @@ def main():
         shot("02-ajustes")
         sh("input keyevent 4")
         time.sleep(1.5)
-    if tocar_em("Novo alarme"):
+    if tocar_rolando("Nova missão"):
         time.sleep(1.5)
-        shot("03-novo-alarme")
+        shot("03-nova-missao")
         sh("input keyevent 4")
         time.sleep(1.5)
 
     # Alarme de teste com a tela apagada: ele precisa acender e abrir sozinho.
-    if not tocar_em("Testar agora (toca em 5 segundos)"):
+    if not tocar_rolando("Testar agora (toca em 5 segundos)"):
         return
     sh("input keyevent 223")  # apaga a tela
     time.sleep(12)
@@ -306,7 +602,7 @@ def main():
     # Segunda rodada: ignorar a checagem tem que trazer o alarme de volta.
     sh(f"am start -n {PKG}/.MainActivity")
     time.sleep(3)
-    if not tocar_em("Testar agora (toca em 5 segundos)"):
+    if not tocar_rolando("Testar agora (toca em 5 segundos)"):
         return
     time.sleep(9)
     if not tocar_em("Começar missão", 20):
@@ -326,7 +622,7 @@ def main():
     tocar_em("Fechar", 10)
     sh(f"am start -n {PKG}/.MainActivity")
     time.sleep(3)
-    if not tocar_em("Testar agora (toca em 5 segundos)"):
+    if not tocar_rolando("Testar agora (toca em 5 segundos)"):
         return
     time.sleep(14)
     tocando = "dumpsys audio | grep -i 'USAGE_ALARM' | grep -i 'state:started' | head -3"
@@ -345,6 +641,10 @@ def main():
         if esperar("Você continua de pé?", 50):
             tocar_em("Estou de pé")
             esperar("Você levantou.", 20)
+
+    if not conferir_disciplina():
+        shot("24-disciplina-falha")
+        return
 
     conferir_hora_de_dormir()
 

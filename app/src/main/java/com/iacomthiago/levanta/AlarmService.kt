@@ -44,6 +44,9 @@ class AlarmService : Service() {
         /** Se ninguém atender nesse tempo, o alarme desiste e registra a falha. */
         const val RING_TIMEOUT_MS = 20 * 60_000L
 
+        /** As missões que não são de levantar tocam por esse tempo e viram um lembrete. */
+        const val MISSION_TIMEOUT_MS = 3 * 60_000L
+
         /** Tempo para responder "estou de pé" antes de o alarme voltar. */
         const val RECHECK_WINDOW_MS = 45_000L
 
@@ -71,6 +74,15 @@ class AlarmService : Service() {
         fun resumeIfNeeded(context: Context) {
             val s = Repo.session ?: return
             val now = System.currentTimeMillis()
+            if (s.type != Tipo.LEVANTAR) {
+                // Toque de missão: se ainda está no prazo volta a tocar; senão some sem registro.
+                if (s.phase == Phase.RINGING && now - s.phaseSince <= MISSION_TIMEOUT_MS) {
+                    send(context, ACTION_RESUME)
+                } else {
+                    Repo.dropSession()
+                }
+                return
+            }
             if (now - s.phaseSince > 3 * 60 * 60_000L) {
                 // Velho demais para retomar: fecha como não atendido.
                 Repo.finishSession(Outcome.NO_ANSWER)
@@ -140,30 +152,49 @@ class AlarmService : Service() {
 
     private fun onAlarm(intent: Intent) {
         val now = System.currentTimeMillis()
-        val existing = Repo.session
-        if (existing != null) {
-            // Já existe um despertar em andamento: o novo toque não o substitui,
-            // a não ser que o antigo tenha ficado preso há mais de uma hora.
-            if (now - existing.phaseSince < 60 * 60_000L) return
-            Repo.finishSession(if (existing.upAt > 0L) Outcome.OK else Outcome.NO_ANSWER)
-        }
-
         val test = intent.getBooleanExtra("test", false)
         val alarmId = intent.getIntExtra("alarmId", -1)
         val alarm = Repo.alarms.firstOrNull { it.id == alarmId }
-        if (!test && (alarm == null || !alarm.enabled)) return
+        val tipo = alarm?.type ?: Tipo.LEVANTAR
+
+        val existing = Repo.session
+        if (existing != null) {
+            if (existing.type != Tipo.LEVANTAR) {
+                // Um toque de missão nunca segura outro alarme, muito menos o de levantar.
+                Repo.dropSession()
+            } else if (now - existing.phaseSince < 60 * 60_000L) {
+                // Já existe um despertar em andamento: o novo toque não o substitui,
+                // a não ser que o antigo tenha ficado preso há mais de uma hora.
+                // Uma missão que cairia no meio do despertar vira só um lembrete.
+                if (!test && alarm != null && alarm.enabled && tipo != Tipo.LEVANTAR) {
+                    Lembrete.missaoEsperando(this, alarm)
+                }
+                return
+            } else {
+                Repo.finishSession(if (existing.upAt > 0L) Outcome.OK else Outcome.NO_ANSWER)
+            }
+        }
+
+        if (!test && (alarm == null || !alarm.enabled || !alarm.toca)) return
+        // Missão já concluída hoje não precisa tocar.
+        if (!test && alarm != null && tipo != Tipo.LEVANTAR && Jogo.feita(alarm)) return
 
         Repo.quietUntil = 0L
         Repo.lastResult = null
         Repo.updateSession(
             Session(
                 alarmId = alarmId,
-                label = if (test) "Teste" else alarm?.label.orEmpty(),
+                label = when {
+                    tipo != Tipo.LEVANTAR -> alarm?.nome.orEmpty()
+                    test -> "Teste"
+                    else -> alarm?.label.orEmpty()
+                },
                 test = test,
                 scheduledAt = intent.getLongExtra("scheduledAt", now),
                 startedAt = now,
                 phase = Phase.RINGING,
                 phaseSince = now,
+                type = tipo,
             )
         )
     }
@@ -181,7 +212,7 @@ class AlarmService : Service() {
 
     private fun onMissionDone() {
         val s = Repo.session ?: return
-        if (!Phase.isLoud(s.phase)) return
+        if (!Phase.isLoud(s.phase) || s.type != Tipo.LEVANTAR) return
         val now = System.currentTimeMillis()
         val up = if (s.upAt == 0L) now else s.upAt
         Repo.quietUntil = 0L
@@ -195,6 +226,7 @@ class AlarmService : Service() {
 
     private fun onSnooze() {
         val s = Repo.session ?: return
+        if (s.type != Tipo.LEVANTAR) return
         if (s.phase != Phase.RINGING || s.snoozesUsed >= Repo.config.maxSnoozes) return
         val now = System.currentTimeMillis()
         val delay = if (s.test) TEST_DELAY_MS else Repo.config.snoozeMinutes * 60_000L
@@ -238,7 +270,16 @@ class AlarmService : Service() {
         val now = System.currentTimeMillis()
         when (s.phase) {
             Phase.RINGING, Phase.RELAPSE -> {
-                if (now - s.phaseSince > RING_TIMEOUT_MS) {
+                if (s.type != Tipo.LEVANTAR) {
+                    if (now - s.phaseSince > MISSION_TIMEOUT_MS) {
+                        // Ninguém atendeu: o som para e fica um lembrete da missão.
+                        val alarme = Repo.alarms.firstOrNull { it.id == s.alarmId }
+                        Repo.dropSession()
+                        if (alarme != null && !s.test) Lembrete.missaoEsperando(this, alarme)
+                        applyPhase(showUi = false, phaseChanged = true)
+                        return
+                    }
+                } else if (now - s.phaseSince > RING_TIMEOUT_MS) {
                     Repo.finishSession(Outcome.NO_ANSWER)
                     applyPhase(showUi = false, phaseChanged = true)
                     return
@@ -519,7 +560,9 @@ class AlarmService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        val recheck = Repo.session?.phase == Phase.RECHECK
+        val sessao = Repo.session
+        val recheck = sessao?.phase == Phase.RECHECK
+        val missao = sessao != null && sessao.type != Tipo.LEVANTAR
         val open = PendingIntent.getActivity(
             this,
             1,
@@ -528,10 +571,19 @@ class AlarmService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_alarm)
-            .setContentTitle(if (recheck) "Você continua de pé?" else "Hora de levantar")
+            .setContentTitle(
+                when {
+                    missao -> "Hora da missão: " + sessao?.label.orEmpty()
+                    recheck -> "Você continua de pé?"
+                    else -> "Hora de levantar"
+                }
+            )
             .setContentText(
-                if (recheck) "Toque para confirmar antes que o alarme volte."
-                else "Toque para abrir e cumprir a missão."
+                when {
+                    missao -> "Toque para parar o som e abrir a missão."
+                    recheck -> "Toque para confirmar antes que o alarme volte."
+                    else -> "Toque para abrir e cumprir a missão."
+                }
             )
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setPriority(NotificationCompat.PRIORITY_MAX)

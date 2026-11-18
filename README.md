@@ -1,10 +1,32 @@
-# Levanta
+# Disciplina
 
-Despertador de disciplina para Android. Não tem botão de cancelar: o alarme só para quando a missão é cumprida, e volta a tocar se você não confirmar que continua de pé.
+App de disciplina para o dia inteiro, para Android. Nasceu como o despertador **Levanta** e cresceu: agora cada parte da rotina é uma missão com horário, que rende experiência, sobe o nível e mantém uma sequência de dias.
 
 Feito para ficar num tablet **longe da cama**, no carregador.
 
-## Como funciona
+## Missões
+
+Ao criar uma missão você escolhe o tipo:
+
+- **Levantar:** o despertador. Toca e **só para com a missão cumprida** (detalhes abaixo). Vale 30 XP.
+- **Estudo:** uma lista de metas do dia, uma por linha (dá para colar várias e deixar prontas as de amanhã). Cada meta se conclui falando um parágrafo curto sobre o que foi estudado; o texto vai para o **diário de estudo**. O app conta as palavras (20 por padrão) e não julga o conteúdo. Se o reconhecimento de voz falhar, dá para digitar. Cada meta vale 30 XP, e fechar todas antes das 14 h dá mais 50.
+- **Treino:** na hora, abre o treino no navegador. Na volta, o botão **Concluí** libera depois de uma parte da duração prevista (60% por padrão, ajustável em cada missão). Vale 40 XP.
+- **Simples:** tarefa rápida com nome livre, concluída com um toque. Vale 10 XP.
+
+Os alarmes que não são o de levantar tocam forte, mas **param com um toque**, que já abre a missão. Se ninguém atender em 3 minutos, o som para e fica um lembrete.
+
+## Progresso
+
+- **Experiência e nível:** cada nível pede 50 XP a mais que o anterior. As faixas de nível têm o nome das marchas (Partida, Primeira marcha, Segunda marcha...) e mudam a cor da borda da imagem do personagem.
+- **Sequência de dias:** cada missão tem a opção **Conta para a sequência**. Um dia em que todas as marcadas foram concluídas soma um; uma marcada sem concluir até o fim do dia zera. Às 19 h o app avisa se ainda falta alguma.
+- **Missão da semana:** de segunda a domingo, um desafio (treinar em 5 dias, fechar as metas de estudo em 5 dias...) que vale 150 XP.
+- **Ideias para depois:** uma caixa para anotar a ideia que apareceu no meio de uma missão e voltar ao que estava fazendo.
+
+A imagem do personagem pode ser trocada em **Ajustes > Seu personagem**, escolhendo da galeria. Ela fica só no aparelho.
+
+Quem já usava o Levanta não perde nada ao atualizar: os alarmes viram missões de levantar, os ajustes continuam e os despertares cumpridos viram experiência.
+
+## O despertador (missão de levantar)
 
 1. **Toca na hora.** Acende a tela por cima do bloqueio, no volume máximo. Começa com a abertura da série HOTARU; se a missão não for cumprida em 60 segundos, a música vira um bipe insistente. Os botões de volume do aparelho não fazem nada enquanto ele toca.
 2. **Missão para desligar.** Uma ou mais, na ordem:
@@ -26,11 +48,11 @@ Tudo é configurável em **Ajustes**: quais missões, quantos acertos e quantas 
 ## Instalar no tablet
 
 1. No tablet, abra a página de versões do repositório: https://github.com/iacomthiago/levanta-despertador/releases/latest
-2. Baixe o arquivo **levanta.apk** e toque nele.
+2. Baixe o arquivo **levanta.apk** e toque nele (o arquivo manteve o nome antigo para a atualização entrar por cima).
 3. O Android vai avisar que o navegador não pode instalar apps. Toque em **Configurações**, ligue **Permitir desta fonte** e volte.
 4. Toque em **Instalar**. Se o Play Protect perguntar, escolha **Instalar mesmo assim** (o app não está na loja, por isso o aviso).
 
-Para atualizar, não precisa voltar ao site: quando existe versão nova, o app mostra um cartão **Versão nova disponível** na tela inicial. Toque em **Atualizar agora**, espere o download e confirme em **Atualizar** na tela do Android (na primeira vez ele pede para permitir instalações a partir do Levanta). A versão nova entra por cima e mantém alarmes e histórico. Em **Ajustes > Sobre o app** dá para conferir a versão instalada e procurar atualização na hora.
+Para atualizar, não precisa voltar ao site: quando existe versão nova, o app mostra um cartão **Versão nova disponível** na tela inicial. Toque em **Atualizar agora**, espere o download e confirme em **Atualizar** na tela do Android (na primeira vez ele pede para permitir instalações a partir do Disciplina). A versão nova entra por cima e mantém missões, nível e histórico. Em **Ajustes > Sobre o app** dá para conferir a versão instalada e procurar atualização na hora.
 
 ## Preparar o tablet (uma vez)
 
@@ -41,11 +63,11 @@ Ao abrir o app, um cartão amarelo lista o que falta liberar. Toque em **Liberar
 - **Aparecer sobre outros apps** (recomendado): faz o alarme tomar a tela mesmo se você estiver usando o tablet.
 - **Microfone** (opcional): deixa o tablet ouvir sua afirmação na missão surpresa. O reconhecimento de voz usa o serviço do próprio Android e normalmente precisa de internet; se falhar, a saída é montar a frase tocando nas palavras.
 
-Em tablets Samsung, confira também em **Configurações > Bateria > Limites de uso em segundo plano** que o Levanta não está em "Apps em suspensão" nem em "Apps em suspensão profunda".
+Em tablets Samsung, confira também em **Configurações > Bateria > Limites de uso em segundo plano** que o Disciplina não está em "Apps em suspensão" nem em "Apps em suspensão profunda".
 
 Depois:
 
-1. Crie um alarme e toque em **Testar agora**. Bloqueie a tela e veja o alarme abrir sozinho. No teste, a checagem chega em 20 segundos e nada entra no histórico.
+1. Crie uma missão de levantar e toque em **Testar agora**. Bloqueie a tela e veja o alarme abrir sozinho. No teste, a checagem chega em 20 segundos e nada entra no histórico.
 2. Deixe o volume de **alarme** do tablet alto e o tablet **no carregador** durante a noite.
 3. Coloque o tablet longe da cama.
 
@@ -60,7 +82,9 @@ Depois:
 O projeto é Kotlin com Jetpack Compose, sem dependência de serviços do Google.
 
 - `app/src/main/java/com/iacomthiago/levanta/`
-  - `Data.kt`: alarmes, ajustes, despertar em andamento e histórico (SharedPreferences).
+  - `Data.kt`: missões (alarmes), ajustes, despertar em andamento e histórico (SharedPreferences).
+  - `Progresso.kt`: experiência, nível, sequência de dias, metas de estudo, missão da semana e a conversão dos dados do Levanta.
+  - `Disciplina.kt`: peças da tela inicial e as telas de estudo, treino, diário e ideias.
   - `Scheduler.kt`: agendamento no AlarmManager e os receptores de alarme e de reinício.
   - `AlarmService.kt`: som, volume e a máquina de fases do despertar.
   - `AlarmActivity.kt`: a tela que abre por cima do bloqueio.
@@ -68,7 +92,7 @@ O projeto é Kotlin com Jetpack Compose, sem dependência de serviços do Google
 - `app/src/main/assets/questoes.json`: o baralho de questões de certo ou errado. Cada item tem a afirmação, o gabarito e a explicação com o artigo.
   - `MainActivity.kt`, `Setup.kt`, `Ui.kt`: telas do app, permissões e componentes.
   - `Atualizacao.kt`: consulta a última versão publicada no GitHub, baixa o instalador e abre a instalação.
-- `.github/workflows/build.yml`: a cada envio para `main`, o GitHub compila o APK, roda `ci/smoke.py` num emulador (alarme de ponta a ponta, com capturas de tela) e, se passar, publica uma versão nova. As missões de fala e de memória ficam fora desse teste: o emulador não fala nem enxerga a sequência.
+- `.github/workflows/build.yml`: a cada envio para `main`, o GitHub compila o APK, roda `ci/smoke.py` num emulador (despertador de ponta a ponta e as telas de missões, com capturas de tela) e, se passar, publica uma versão nova. As missões de fala e de memória ficam fora desse teste: o emulador não fala nem enxerga a sequência.
 - `ci/make_sounds.py`: gera os sons do alarme e da checagem.
 
 Não é preciso ter o Android SDK no computador: a compilação acontece no GitHub. A chave de assinatura fica nos segredos do repositório (`KEYSTORE_B64` e `KEYSTORE_PASSWORD`).

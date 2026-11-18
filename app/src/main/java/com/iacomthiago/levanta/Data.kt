@@ -21,7 +21,31 @@ class App : Application() {
     }
 }
 
-/** Um alarme configurado. [days] usa 1 = segunda ... 7 = domingo. */
+/** Tipos de missão. O de levantar é o despertador: só para com a missão cumprida. */
+object Tipo {
+    const val LEVANTAR = "levantar"
+    const val ESTUDO = "estudo"
+    const val TREINO = "treino"
+    const val SIMPLES = "simples"
+
+    val todos = listOf(LEVANTAR, ESTUDO, TREINO, SIMPLES)
+
+    fun nome(tipo: String): String = when (tipo) {
+        ESTUDO -> "Estudo"
+        TREINO -> "Treino"
+        SIMPLES -> "Simples"
+        else -> "Levantar"
+    }
+}
+
+const val URL_TREINO = "https://iacomthiago.github.io/treino-em-casa/"
+
+/**
+ * Uma missão com horário. [days] usa 1 = segunda ... 7 = domingo.
+ *
+ * Os alarmes salvos antes de existirem os tipos não têm os campos novos e são
+ * lidos como missões de levantar, que é o que eles eram.
+ */
 data class Alarm(
     val id: Int,
     val hour: Int,
@@ -29,7 +53,24 @@ data class Alarm(
     val days: Set<Int> = (1..7).toSet(),
     val enabled: Boolean = true,
     val label: String = "",
-)
+    val type: String = Tipo.LEVANTAR,
+    /** Conta para a sequência: sem concluir até o fim do dia, a sequência zera. */
+    val counts: Boolean = true,
+    /** Toca no horário. A missão de levantar toca sempre. */
+    val rings: Boolean = true,
+    /** Treino: duração prevista, em minutos. */
+    val minutes: Int = 30,
+    /** Treino: parte da duração que precisa passar para liberar o "Concluí". */
+    val minPercent: Int = 60,
+    /** Treino: endereço que abre no navegador; vazio usa [URL_TREINO]. */
+    val url: String = "",
+    /** Quando a missão foi criada; no dia da criação ela só vale se a hora ainda não passou. */
+    val createdAt: Long = 0L,
+) {
+    val toca: Boolean get() = type == Tipo.LEVANTAR || rings
+    val nome: String get() = label.ifBlank { Tipo.nome(type) }
+    val endereco: String get() = url.ifBlank { URL_TREINO }
+}
 
 /** Regras de disciplina, iguais para todos os alarmes. */
 data class Config(
@@ -62,6 +103,12 @@ data class Config(
     /** Avisa a hora de deitar para dormir [sleepMinutes] antes do próximo alarme. */
     val bedtimeEnabled: Boolean = true,
     val sleepMinutes: Int = 480,
+    /** Fechar todas as metas de estudo antes desta hora dá bônus. */
+    val studyBonusHour: Int = 14,
+    /** Mínimo de palavras no resumo que conclui uma meta de estudo. */
+    val minWords: Int = 20,
+    /** Avisa no começo da noite se ainda há missão que conta para a sequência. */
+    val streakWarning: Boolean = true,
 )
 
 /** Uma questão de certo ou errado do baralho em assets/questoes.json. */
@@ -110,6 +157,8 @@ data class Session(
     val rechecksDone: Int = 0,
     val relapses: Int = 0,
     val nextEventAt: Long = 0L,
+    /** Tipo da missão que tocou; as que não são de levantar param com um toque. */
+    val type: String = Tipo.LEVANTAR,
 )
 
 object Outcome {
@@ -172,6 +221,7 @@ object Repo {
         session = readSession()
         history = readHistory()
         quizStats = readQuizStats()
+        Jogo.init(context.applicationContext, prefs)
     }
 
     // ---------- alarmes ----------
@@ -193,6 +243,12 @@ object Repo {
         writeAlarms()
     }
 
+    /** Troca a lista inteira de uma vez (usado na conversão dos dados antigos). */
+    fun replaceAlarms(list: List<Alarm>) {
+        alarms = list.sortedBy { it.hour * 60 + it.minute }
+        writeAlarms()
+    }
+
     private fun writeAlarms() {
         val arr = JSONArray()
         for (a in alarms) {
@@ -204,6 +260,13 @@ object Repo {
                     .put("days", JSONArray(a.days.sorted()))
                     .put("enabled", a.enabled)
                     .put("label", a.label)
+                    .put("type", a.type)
+                    .put("counts", a.counts)
+                    .put("rings", a.rings)
+                    .put("minutes", a.minutes)
+                    .put("minPercent", a.minPercent)
+                    .put("url", a.url)
+                    .put("createdAt", a.createdAt)
             )
         }
         prefs.edit().putString("alarms", arr.toString()).apply()
@@ -223,6 +286,13 @@ object Repo {
                     days = (0 until d.length()).map { d.getInt(it) }.toSet(),
                     enabled = o.optBoolean("enabled", true),
                     label = o.optString("label", ""),
+                    type = o.optString("type", Tipo.LEVANTAR).takeIf { it in Tipo.todos } ?: Tipo.LEVANTAR,
+                    counts = o.optBoolean("counts", true),
+                    rings = o.optBoolean("rings", true),
+                    minutes = o.optInt("minutes", 30),
+                    minPercent = o.optInt("minPercent", 60),
+                    url = o.optString("url", ""),
+                    createdAt = o.optLong("createdAt", 0L),
                 )
             }
         } catch (e: Exception) {
@@ -258,6 +328,9 @@ object Repo {
             .put("examDate", value.examDate)
             .put("bedtimeEnabled", value.bedtimeEnabled)
             .put("sleepMinutes", value.sleepMinutes)
+            .put("studyBonusHour", value.studyBonusHour)
+            .put("minWords", value.minWords)
+            .put("streakWarning", value.streakWarning)
         prefs.edit().putString("config", o.toString()).apply()
     }
 
@@ -290,6 +363,9 @@ object Repo {
                 examDate = o.optString("examDate", d.examDate),
                 bedtimeEnabled = o.optBoolean("bedtimeEnabled", d.bedtimeEnabled),
                 sleepMinutes = o.optInt("sleepMinutes", d.sleepMinutes),
+                studyBonusHour = o.optInt("studyBonusHour", d.studyBonusHour),
+                minWords = o.optInt("minWords", d.minWords),
+                streakWarning = o.optBoolean("streakWarning", d.streakWarning),
             )
         } catch (e: Exception) {
             Config()
@@ -313,6 +389,7 @@ object Repo {
             .put("rechecksDone", value.rechecksDone)
             .put("relapses", value.relapses)
             .put("nextEventAt", value.nextEventAt)
+            .put("type", value.type)
         // commit(): se o processo morrer logo depois, o estado já está em disco.
         prefs.edit().putString("session", o.toString()).commit()
     }
@@ -334,6 +411,7 @@ object Repo {
                 rechecksDone = o.optInt("rechecksDone", 0),
                 relapses = o.optInt("relapses", 0),
                 nextEventAt = o.optLong("nextEventAt", 0L),
+                type = o.optString("type", Tipo.LEVANTAR),
             )
         } catch (e: Exception) {
             null
@@ -362,7 +440,20 @@ object Repo {
         if (!s.test) {
             history = (listOf(entry) + history).take(400)
             writeHistory()
+            if (outcome == Outcome.OK) Jogo.concluirLevantar(s.alarmId, s.scheduledAt)
         }
+    }
+
+    /**
+     * Encerra, sem registrar no histórico, o toque de uma missão que não é a de
+     * levantar: essas param com um toque e a conclusão acontece na tela da missão.
+     */
+    fun dropSession() {
+        if (session == null) return
+        session = null
+        prefs.edit().remove("session").commit()
+        quietUntil = 0L
+        silenceUntil = 0L
     }
 
     // ---------- histórico ----------
@@ -446,7 +537,7 @@ object Repo {
             prefs.edit().putString("lastSurprise", value).apply()
         }
 
-    /** Dias seguidos (do mais recente para trás) em que a missão foi cumprida. */
+    /** Despertares seguidos (do mais recente para trás) em que a missão foi cumprida. */
     fun streak(): Int = history.takeWhile { it.outcome == Outcome.OK }.size
 
     /** Média, em minutos, entre o alarme tocar e a missão ser cumprida. */
