@@ -305,15 +305,12 @@ def escrever_resumo():
     """Digita o resumo aos poucos, até passar do mínimo de palavras.
 
     O emulador engole teclas quando o texto vem comprido de uma vez só, então
-    o contador da tela é que diz quando parar.
+    quem diz quando parar é o próprio campo (o contador da tela pode estar
+    escondido atrás do teclado).
     """
     for _ in range(16):
-        contagem = None
-        for t in textos(dump()):
-            m = re.fullmatch(r"(\d+) de (\d+) palavras", t)
-            if m:
-                contagem = (int(m.group(1)), int(m.group(2)))
-        if contagem and contagem[0] > contagem[1]:
+        campos = [n for n in dump() if n["cls"].endswith("EditText")]
+        if campos and len(campos[-1]["text"].split()) >= 24:
             return True
         digitar("estudei o artigo e entendi ")
         time.sleep(1.0)

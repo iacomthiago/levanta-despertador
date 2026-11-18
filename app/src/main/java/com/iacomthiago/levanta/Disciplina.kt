@@ -839,19 +839,19 @@ fun TelaResumo(metaId: Long, onVoltar: () -> Unit) {
             if (texto.isBlank()) "Falar agora" else "Falar mais",
             principal = palavras < minimo,
         )
-        Espaco(12)
-        OutlinedTextField(
-            value = texto,
-            onValueChange = { texto = it.take(4000) },
-            label = { Text("Seu resumo") },
-            minLines = 5,
-            modifier = Modifier.fillMaxWidth(),
-        )
+        // O contador fica acima do campo para continuar visível com o teclado aberto.
         Text(
             "$palavras de $minimo palavras",
             fontSize = 14.sp,
             color = if (palavras >= minimo) Cor.Verde else Cor.Suave,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = 12.dp, bottom = 6.dp),
+        )
+        OutlinedTextField(
+            value = texto,
+            onValueChange = { texto = it.take(4000) },
+            label = { Text("Seu resumo") },
+            minLines = 4,
+            modifier = Modifier.fillMaxWidth(),
         )
         Espaco(16)
         BotaoPrincipal("Guardar e concluir (+${Xp.META} XP)", habilitado = palavras >= minimo) {
