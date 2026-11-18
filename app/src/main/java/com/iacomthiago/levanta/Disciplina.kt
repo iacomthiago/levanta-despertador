@@ -269,6 +269,8 @@ fun situacao(alarme: Alarm, agora: Long): Situacao {
 
         else -> when {
             Repo.session?.alarmId == alarme.id -> Situacao("Em andamento", Cor.Lilas)
+            // Criada hoje depois da própria hora: o primeiro toque é só amanhã.
+            passou && !Jogo.vale(alarme.copy(counts = true), LocalDate.now()) -> Situacao("Começa amanhã", Cor.Suave)
             passou -> Situacao("Não cumprida", Cor.Vermelho)
             else -> Situacao("Pendente", Cor.Suave)
         }
