@@ -443,6 +443,12 @@ def treinar():
     m = re.search(r" ([\w.]+)/", topo)
     if m and m.group(1) != PKG and re.search(r"chrome|browser|webview", m.group(1), re.I):
         sh(f"am force-stop {m.group(1)}")
+    time.sleep(2)
+    if not achar(dump(), "Já pode concluir."):
+        # O app pode voltar na tela inicial; a missão em andamento continua na lista de hoje.
+        log("o app não voltou na tela do treino; abrindo pela lista de hoje")
+        if not tocar_rolando("TREINO", contendo=True):
+            return False
     if not esperar("Já pode concluir.", 15):
         return False
     if not tocar_em("Concluí (+40 XP)", 15):
