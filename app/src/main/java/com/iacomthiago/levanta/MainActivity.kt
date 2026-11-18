@@ -51,6 +51,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -82,6 +84,7 @@ class MainActivity : ComponentActivity() {
         }
         Scheduler.rescheduleAll(this)
         AlarmService.resumeIfNeeded(this)
+        Sync.init(this)
         lerPedido(intent)
         setContent {
             LevantaTheme {
@@ -109,6 +112,14 @@ class MainActivity : ComponentActivity() {
         if (Phase.isActive(Repo.session?.phase)) {
             startActivity(Intent(this, AlarmActivity::class.java))
         }
+        // Abrir o app busca o que mudou nos outros aparelhos (se a sincronização estiver ligada).
+        Sync.pedir(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Ao sair, envia o que ficou por subir.
+        Sync.pedir(this)
     }
 }
 
@@ -124,11 +135,12 @@ private sealed interface Tela {
     data object Recompensas : Tela
     data class Diario(val doEstudo: Boolean) : Tela
     data class Ideias(val doEstudo: Boolean) : Tela
+    data object Sincronizar : Tela
 }
 
 /** Para onde o botão de voltar leva a partir de cada tela. */
 private fun anterior(tela: Tela): Tela = when (tela) {
-    is Tela.Cadastro, is Tela.Treino -> Tela.Ajustes
+    is Tela.Cadastro, is Tela.Treino, is Tela.Sincronizar -> Tela.Ajustes
     is Tela.Diario -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
     is Tela.Ideias -> if (tela.doEstudo) Tela.Estudo else Tela.Inicio
     else -> Tela.Inicio
@@ -147,6 +159,24 @@ private fun AppPrincipal() {
 
     BackHandler(enabled = tela != Tela.Inicio) {
         tela = anterior(tela)
+    }
+
+    // Sincronização ligada: pouco depois de cada mudança ela sobe sozinha e, com o
+    // app na frente, busca a cada minuto o que mudou nos outros aparelhos.
+    if (Sync.ligada) {
+        val contexto = LocalContext.current
+        val dono = LocalLifecycleOwner.current
+        val marca = Sync.marcaDoEstado()
+        LaunchedEffect(marca) {
+            delay(2_500L)
+            Sync.pedir(contexto)
+        }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(60_000L)
+                if (dono.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) Sync.pedir(contexto)
+            }
+        }
     }
 
     // O alarme de uma missão (ou um lembrete) pediu uma tela: vai direto para ela.
@@ -175,11 +205,13 @@ private fun AppPrincipal() {
             onVoltar = { tela = Tela.Inicio },
             onCadastrar = { tela = Tela.Cadastro },
             onTreinar = { tela = Tela.Treino(it) },
+            onSincronizar = { tela = Tela.Sincronizar },
         )
 
         is Tela.Treino -> TelaTreino(atual.passo, onVoltar = { tela = Tela.Ajustes })
         is Tela.Historico -> TelaHistorico(onVoltar = { tela = Tela.Inicio })
         is Tela.Cadastro -> TelaCadastro(onVoltar = { tela = Tela.Ajustes })
+        is Tela.Sincronizar -> TelaSincronizar(onVoltar = { tela = Tela.Ajustes })
 
         is Tela.Missao -> {
             val alarme = Repo.alarms.firstOrNull { it.id == atual.id }
@@ -612,7 +644,12 @@ private fun TelaEditar(original: Alarm?, onVoltar: () -> Unit) {
 // ---------- ajustes ----------
 
 @Composable
-private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar: (String) -> Unit) {
+private fun TelaAjustes(
+    onVoltar: () -> Unit,
+    onCadastrar: () -> Unit,
+    onTreinar: (String) -> Unit,
+    onSincronizar: () -> Unit,
+) {
     val context = LocalContext.current
     val c = Repo.config
     val niveis = listOf("Fácil", "Média", "Difícil")
@@ -871,6 +908,44 @@ private fun TelaAjustes(onVoltar: () -> Unit, onCadastrar: () -> Unit, onTreinar
             )
         }
 
+        TituloSecao("Sincronização com o site")
+        Cartao {
+            var confirmar by remember { mutableStateOf(false) }
+            if (Sync.ligada) {
+                Text("Ligada", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, color = Cor.Verde)
+                Text(
+                    "O que você faz aqui aparece sozinho no site ($SITE_DISCIPLINA), e o que você faz lá aparece aqui. " +
+                        "Não precisa apertar nada.",
+                    fontSize = 14.sp,
+                    color = Cor.Suave,
+                )
+                if (Sync.situacao.isNotEmpty()) {
+                    Text(Sync.situacao, fontSize = 14.sp, color = Cor.Suave, modifier = Modifier.padding(top = 6.dp))
+                }
+                Espaco(10)
+                BotaoSecundario(if (confirmar) "Desligar mesmo? Toque de novo" else "Desligar neste tablet") {
+                    if (confirmar) Sync.desligar(context)
+                    confirmar = !confirmar
+                }
+                Text(
+                    "Desligar não apaga nada: o progresso continua neste tablet e na sua conta.",
+                    fontSize = 13.sp,
+                    color = Cor.Suave,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            } else {
+                Text("Desligada", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Ligando, o progresso deste tablet aparece igual no site, no celular e no computador. " +
+                        "O despertador continua só aqui.",
+                    fontSize = 14.sp,
+                    color = Cor.Suave,
+                )
+                Espaco(10)
+                BotaoSecundario("Ligar a sincronização", onClick = onSincronizar)
+            }
+        }
+
         TituloSecao("Sobre o app")
         Cartao {
             Text("Versão instalada: ${Atualizacao.nomeInstalado(context)}", fontSize = 17.sp)
@@ -956,6 +1031,85 @@ private fun TelaCadastro(onVoltar: () -> Unit) {
             }
             Espaco(10)
             BotaoSecundario("Ler outro") { lido = null }
+        }
+        Espaco(20)
+    }
+}
+
+// ---------- sincronização com o site ----------
+
+/** Liga a sincronização lendo o QR code que o site mostra, ou colando a chave. */
+@Composable
+private fun TelaSincronizar(onVoltar: () -> Unit) {
+    val context = LocalContext.current
+    var camera by remember { mutableStateOf(cameraLiberada(context)) }
+    val pedirCamera = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        camera = ok
+    }
+    var colada by remember { mutableStateOf("") }
+    // Um código que o GitHub recusou não é tentado de novo enquanto continua na frente da câmera.
+    var recusado by remember { mutableStateOf("") }
+
+    Pagina {
+        Cabecalho("Sincronizar com o site", onVoltar)
+        if (Sync.ligada) {
+            Cartao(cor = Cor.CartaoAlto) {
+                Text("Sincronização ligada.", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Cor.Verde)
+                Espaco(4)
+                Text(
+                    "O progresso deste tablet já está indo para a sua conta. Daqui para a frente é sozinho.",
+                    fontSize = 16.sp,
+                    color = Cor.Suave,
+                )
+            }
+            Espaco(16)
+            BotaoPrincipal("Voltar", onClick = onVoltar)
+        } else {
+            Text(
+                "1. No computador ou no celular, abra $SITE_DISCIPLINA\n" +
+                    "2. Lá, ligue a sincronização e toque em \"Ligar outro aparelho\".\n" +
+                    "3. Aponte a câmera deste tablet para o QR code que aparecer.",
+                fontSize = 16.sp,
+                lineHeight = 23.sp,
+                color = Cor.Suave,
+            )
+            Espaco(14)
+            when {
+                Sync.ligando -> Text("Conferindo a chave…", fontSize = 18.sp, color = Cor.Lilas)
+
+                camera -> Leitor(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(380.dp)
+                        .clip(RoundedCornerShape(20.dp)),
+                ) { codigo ->
+                    val pareceChave = codigo.contains("k=") || codigo.startsWith("ghp_") || codigo.startsWith("github_pat_")
+                    if (pareceChave && codigo != recusado && !Sync.ligando && !Sync.ligada) {
+                        Sync.ligar(context, codigo) { ok -> if (!ok) recusado = codigo }
+                    }
+                }
+
+                else -> BotaoPrincipal("Liberar a câmera para ler o QR code") {
+                    pedirCamera.launch(Manifest.permission.CAMERA)
+                }
+            }
+            if (Sync.avisoDeLigar.isNotEmpty()) {
+                Espaco(10)
+                Text(Sync.avisoDeLigar, fontSize = 15.sp, color = Cor.Ouro)
+            }
+
+            TituloSecao("Ou cole a chave")
+            OutlinedTextField(
+                value = colada,
+                onValueChange = { colada = it.take(200) },
+                singleLine = true,
+                label = { Text("Chave do GitHub (começa com ghp_)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Espaco(10)
+            BotaoSecundario("Conectar com a chave colada", habilitado = colada.trim().length >= 20 && !Sync.ligando) {
+                Sync.ligar(context, colada)
+            }
         }
         Espaco(20)
     }

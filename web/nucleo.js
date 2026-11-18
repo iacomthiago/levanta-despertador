@@ -729,8 +729,10 @@
   function gravarMissao(doc, m, agora, sorteio) {
     var id = m.id;
     if (!id) {
+      // De 1.000.000 a 899.999.999: longe dos números pequenos que o app Android dá às
+      // missões dele e dos que ele reserva para os próprios avisos (900.001 em diante).
       do {
-        id = 100000 + Math.floor((sorteio || Math.random)() * 899000000);
+        id = 1000000 + Math.floor((sorteio || Math.random)() * 899000000);
       } while (doc.missoes[id]);
     }
     var antiga = doc.missoes[id];

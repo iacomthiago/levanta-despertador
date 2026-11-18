@@ -3,6 +3,13 @@ name: Compilar e testar
 on:
   push:
     branches: [main]
+    # Mudança só no site (pasta web) não gera versão nova do app. As regras
+    # compartilhadas com o app (nucleo.js e vetores.js) são a exceção.
+    paths:
+      - '**'
+      - '!web/**'
+      - 'web/nucleo.js'
+      - 'web/vetores.js'
   workflow_dispatch:
 
 permissions:
@@ -41,6 +48,17 @@ jobs:
           else
             echo "::warning::Sem chave de assinatura nos segredos; usando chave temporária."
           fi
+
+      # A sincronização com o site depende de o app e o site fazerem a mesma
+      # conta. O site gera os casos e o app confere que chega aos mesmos resultados.
+      - name: Conferir as regras do site e gerar os casos de junção
+        run: |
+          mkdir -p ci-out
+          node web/teste.js
+          node web/vetores.js > ci-out/vetores.json
+
+      - name: Conferir que o app junta igual ao site
+        run: gradle --no-daemon testReleaseUnitTest
 
       - name: Compilar
         env:

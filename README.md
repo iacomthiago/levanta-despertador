@@ -72,6 +72,17 @@ Depois:
 2. Deixe o volume de **alarme** do tablet alto e o tablet **no carregador** durante a noite.
 3. Coloque o tablet longe da cama.
 
+## No celular e no computador (site)
+
+O Disciplina também abre no navegador, em **https://iacomthiago.github.io/levanta-despertador/**, inclusive no iPhone (Compartilhar > Adicionar à Tela de Início). O site tem as missões de estudo, treino e simples, os blocos de 30 minutos, XP, nível, sequência, missão da semana, recompensas e ideias. Não tem o despertador: site não toca alarme.
+
+Para ter o mesmo progresso em mais de um aparelho, ligue a sincronização uma vez em cada um:
+
+1. No site, toque em Ajustes > Ligar a sincronização e siga os três passos. O progresso fica numa nota secreta (gist) da sua conta do GitHub; a chave tem permissão só para isso.
+2. Nos outros aparelhos, não precisa digitar: no site, Ajustes > Ligar outro aparelho mostra um QR code. No tablet, Ajustes > Sincronização com o site > Ligar a sincronização lê esse código; no celular, basta apontar a câmera.
+
+Depois disso é sozinho: cada mudança sobe e cada abertura busca o que mudou. Se dois aparelhos mudarem no mesmo dia, nada se perde: um bloco marcado no site e outro no tablet aparecem nos dois. Cada pessoa usa a própria conta do GitHub, então o progresso de uma não se mistura com o de outra.
+
 ## Limites
 
 - Desligar o tablet, forçar a parada do app nas configurações ou desinstalar silencia o alarme. Nenhum app consegue impedir isso.
@@ -95,5 +106,11 @@ O projeto é Kotlin com Jetpack Compose, sem dependência de serviços do Google
   - `Atualizacao.kt`: consulta a última versão publicada no GitHub, baixa o instalador e abre a instalação.
 - `.github/workflows/build.yml`: a cada envio para `main`, o GitHub compila o APK, roda `ci/smoke.py` num emulador (despertador de ponta a ponta e as telas de missões, com capturas de tela) e, se passar, publica uma versão nova. As missões de fala e de memória ficam fora desse teste: o emulador não fala nem enxerga a sequência.
 - `ci/make_sounds.py`: gera os sons do alarme e da checagem.
+- `web/`: o site (HTML e JavaScript puro, sem etapa de compilação). `nucleo.js` tem as regras e a junção de dados; `app.js`, as telas; `nuvem.js`, a conversa com o GitHub; `qr.js`, o QR code. `teste.html` roda as conferências das regras no navegador.
+- `Sync.kt` e `SyncNucleo.kt`: a sincronização no app. `SyncNucleo.kt` é a mesma conta de `web/nucleo.js`; o teste `NucleoTest` compara os dois caso a caso a cada compilação (os casos saem de `web/vetores.js`). Nada do despertador chama a sincronização, e os alarmes de levantar nunca são alterados por ela.
+- `.github/workflows/site.yml`: publica a pasta `web` no ramo `gh-pages` a cada mudança. Mudança só no site não gera versão nova do app.
+- `ci/mock_gist.py`: imitação da API de gists para testar a sincronização do site sem conta. `ci/make_web_assets.py`: gera os ícones do site.
+
+Formato dos dados sincronizados: um JSON por conta em que cada item (bloco, missão concluída, ideia, missão, ajuste) leva a hora da última mudança. Juntar dois aparelhos fica com a mudança mais recente de cada item. O XP não viaja como número: é recalculado dos registros, mais uma base fixa com o que o tablet já tinha no dia em que entrou na conta.
 
 Não é preciso ter o Android SDK no computador: a compilação acontece no GitHub. A chave de assinatura fica nos segredos do repositório (`KEYSTORE_B64` e `KEYSTORE_PASSWORD`).

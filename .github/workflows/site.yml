@@ -1,0 +1,36 @@
+name: Publicar o site
+
+# O site do Disciplina é a pasta web. Cada mudança nela, no ramo principal, é
+# conferida e copiada para o ramo gh-pages, que o GitHub Pages serve em
+# https://iacomthiago.github.io/levanta-despertador/
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - '.github/workflows/site.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Conferir e publicar
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Conferir as regras do site
+        run: node web/teste.js
+
+      - name: Copiar a pasta web para o ramo gh-pages
+        run: git push --force origin "$(git subtree split --prefix web HEAD):refs/heads/gh-pages"

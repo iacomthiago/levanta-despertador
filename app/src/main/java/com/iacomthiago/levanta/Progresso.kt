@@ -745,6 +745,49 @@ object Jogo {
         }
     }
 
+    // ---------- sincronização ----------
+
+    /**
+     * Troca o progresso deste aparelho pelo que saiu da junção com os outros
+     * (ver Sync.kt). Só a sincronização chama, e só com ela ligada; os números
+     * já chegam calculados dos registros juntados.
+     */
+    fun aplicarSync(
+        novoXp: Int,
+        novosFeitos: List<Feito>,
+        novosBlocos: Map<String, Set<Int>>,
+        novosTurbos: Int,
+        novoTurboEm: String,
+        novoMarco: Int,
+        novosPremios: String,
+        novosPegos: Set<Int>,
+        novasIdeias: List<Ideia>,
+        novaSequencia: Int,
+        novoRecorde: Int,
+        novaSemana: Semana?,
+    ) {
+        xp = novoXp.coerceAtLeast(0)
+        feitos = novosFeitos.takeLast(4000)
+        turbos = novosTurbos.coerceAtLeast(0)
+        turboEm = novoTurboEm
+        marcoPago = novoMarco
+        premios = novosPremios.ifBlank { PREMIOS_PADRAO }
+        premiosPegos = novosPegos
+        sequencia = novaSequencia.coerceAtLeast(0)
+        recorde = maxOf(novoRecorde, sequencia)
+        fechadoAte = LocalDate.now().minusDays(1).toString()
+        if (novaSemana != null) semana = novaSemana
+        salvar()
+        if (novosBlocos != blocos) {
+            blocos = novosBlocos
+            salvarBlocos()
+        }
+        if (novasIdeias != ideias) {
+            ideias = novasIdeias
+            salvarIdeias()
+        }
+    }
+
     // ---------- ideias para depois ----------
 
     fun anotarIdeia(texto: String) {

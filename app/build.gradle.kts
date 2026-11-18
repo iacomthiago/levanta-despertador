@@ -76,4 +76,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-core")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("com.google.zxing:core:3.4.1")
+
+    // Só para o teste que roda no computador (NucleoTest): o JSON de verdade
+    // no lugar do molde vazio que o Android oferece fora do aparelho.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
