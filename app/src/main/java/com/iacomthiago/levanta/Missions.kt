@@ -733,7 +733,7 @@ fun MissaoVoz(frase: String, onConcluir: () -> Unit) {
             try {
                 tts.setLanguage(Locale("pt", "BR"))
                 tts.setSpeechRate(0.95f)
-                // Sai pelo canal de alarme, que está no volume máximo enquanto o alarme toca.
+                // Sai pelo canal de alarme, que está no teto de volume enquanto o alarme toca.
                 tts.setAudioAttributes(
                     AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_ALARM)

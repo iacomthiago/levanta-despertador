@@ -976,9 +976,19 @@ private fun TelaAjustes(
                     Repo.updateConfig(c.copy(musicSeconds = it))
                 }
             }
-            LinhaChave("Volume crescente", "Começa bem baixinho e vai subindo aos poucos, até o máximo em 1 minuto.", c.gradualVolume) {
+            LinhaChave("Volume crescente", "Começa bem baixinho e vai subindo aos poucos, até o volume máximo escolhido abaixo, em 1 minuto.", c.gradualVolume) {
                 Repo.updateConfig(c.copy(gradualVolume = it))
             }
+            LinhaNumero("Volume máximo do alarme", c.maxVolume, VOLUME_MINIMO..100, passo = 5, rotulo = { "$it%" }) {
+                Repo.updateConfig(c.copy(maxVolume = it))
+            }
+            Text(
+                "Quanto do volume do aparelho o alarme usa. Vale para todos os alarmes. " +
+                    "Se acordar a casa, diminua; se não acordar você, aumente.",
+                color = Cor.Suave,
+                fontSize = 14.sp,
+                lineHeight = 19.sp,
+            )
             LinhaNumero(
                 "Sonecas permitidas",
                 c.maxSnoozes,

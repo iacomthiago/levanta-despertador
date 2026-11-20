@@ -47,7 +47,7 @@ class AlarmService : Service() {
         /** As missões que não são de levantar tocam por esse tempo e viram um lembrete. */
         const val MISSION_TIMEOUT_MS = 3 * 60_000L
 
-        /** Volume crescente: tempo do primeiro toque até o volume cheio. */
+        /** Volume crescente: tempo do primeiro toque até o teto do volume. */
         const val RAMP_MS = 60_000L
 
         /** Volume crescente: fração do volume em que o som começa (bem baixinho). */
@@ -304,7 +304,7 @@ class AlarmService : Service() {
                     applyPhase(showUi = true, phaseChanged = true)
                     return
                 }
-                setStreamVolume(0.6f)
+                setStreamVolume(minOf(0.6f, teto()))
             }
 
             else -> applyPhase(showUi = false, phaseChanged = true)
@@ -351,6 +351,9 @@ class AlarmService : Service() {
                 -1
             }
         }
+        // Já começa dentro do teto: sem isso, o primeiro meio segundo sairia no
+        // volume em que o aparelho estava.
+        setStreamVolume(if (kind == SOUND_CHIME) minOf(0.6f, teto()) else teto())
         try {
             val recurso = when (kind) {
                 SOUND_MUSIC -> R.raw.abertura
@@ -419,9 +422,15 @@ class AlarmService : Service() {
         }
     }
 
+    /**
+     * Até onde o volume do aparelho vai enquanto o alarme toca. O padrão é 75%:
+     * no máximo, o tablet acordava a casa inteira. Vale para todos os alarmes.
+     */
+    private fun teto(): Float = Repo.config.maxVolume.coerceIn(VOLUME_MINIMO, 100) / 100f
+
     private fun keepLoud(s: Session, now: Long) {
-        // Se alguém baixou o volume do aparelho, ele volta ao máximo.
-        setStreamVolume(1f)
+        // Se alguém mexeu no volume do aparelho, ele volta para o teto escolhido.
+        setStreamVolume(teto())
         val volume = loudVolume(s, now)
         try {
             player?.setVolume(volume, volume)

@@ -72,6 +72,9 @@ data class Alarm(
     val endereco: String get() = url.ifBlank { URL_TREINO }
 }
 
+/** Menor teto de volume que dá para escolher: abaixo disso o alarme pode não acordar. */
+const val VOLUME_MINIMO = 40
+
 /** Regras de disciplina, iguais para todos os alarmes. */
 data class Config(
     val mathEnabled: Boolean = true,
@@ -84,6 +87,8 @@ data class Config(
     val recheckCount: Int = 1,
     val recheckMinutes: Int = 5,
     val gradualVolume: Boolean = true,
+    /** Teto do volume do alarme, em % do volume do aparelho (pedido de 20/11/2026: acordava a casa). */
+    val maxVolume: Int = 75,
     val maxSnoozes: Int = 0,
     val snoozeMinutes: Int = 5,
     val openClaude: Boolean = true,
@@ -317,6 +322,7 @@ object Repo {
             .put("recheckCount", value.recheckCount)
             .put("recheckMinutes", value.recheckMinutes)
             .put("gradualVolume", value.gradualVolume)
+            .put("maxVolume", value.maxVolume)
             .put("maxSnoozes", value.maxSnoozes)
             .put("snoozeMinutes", value.snoozeMinutes)
             .put("openClaude", value.openClaude)
@@ -353,6 +359,7 @@ object Repo {
                 recheckCount = o.optInt("recheckCount", d.recheckCount),
                 recheckMinutes = o.optInt("recheckMinutes", d.recheckMinutes),
                 gradualVolume = o.optBoolean("gradualVolume", d.gradualVolume),
+                maxVolume = o.optInt("maxVolume", d.maxVolume).coerceIn(VOLUME_MINIMO, 100),
                 maxSnoozes = o.optInt("maxSnoozes", d.maxSnoozes),
                 snoozeMinutes = o.optInt("snoozeMinutes", d.snoozeMinutes),
                 openClaude = o.optBoolean("openClaude", d.openClaude),
