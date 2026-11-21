@@ -968,7 +968,7 @@ private fun TelaAjustes(
         Cartao {
             LinhaChave(
                 "Começar com a abertura do HOTARU",
-                "A música toca primeiro. Se a missão não for cumprida a tempo, entra o bipe.",
+                "A música toca primeiro. Se a missão não for cumprida a tempo, entra um canto de pássaros.",
                 c.musicFirst,
             ) { Repo.updateConfig(c.copy(musicFirst = it)) }
             if (c.musicFirst) {

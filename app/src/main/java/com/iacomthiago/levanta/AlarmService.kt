@@ -290,7 +290,7 @@ class AlarmService : Service() {
                     applyPhase(showUi = false, phaseChanged = true)
                     return
                 }
-                // Acabou o tempo da música: entra o bipe, sem trégua de estilo.
+                // Acabou o tempo da música: entra o canto de pássaros.
                 startSound(loudSound(s, now))
                 keepLoud(s, now)
             }
@@ -357,7 +357,7 @@ class AlarmService : Service() {
         try {
             val recurso = when (kind) {
                 SOUND_MUSIC -> R.raw.abertura
-                SOUND_ALARM -> R.raw.alarm
+                SOUND_ALARM -> R.raw.passaros
                 else -> R.raw.chime
             }
             val afd = resources.openRawResourceFd(recurso)
@@ -385,7 +385,7 @@ class AlarmService : Service() {
             currentSound = kind
             Log.i(TAG, "som=" + when (kind) {
                 SOUND_MUSIC -> "musica"
-                SOUND_ALARM -> "bipe"
+                SOUND_ALARM -> "passaros"
                 else -> "checagem"
             })
         } catch (e: Exception) {
@@ -395,7 +395,11 @@ class AlarmService : Service() {
         if (kind == SOUND_ALARM) startVibration() else stopVibration()
     }
 
-    /** Música da abertura primeiro; passado o prazo, ou numa recaída, o bipe. */
+    /**
+     * Música da abertura primeiro; passado o prazo, ou numa recaída, o canto de
+     * pássaros. Ele substituiu o bipe agudo em 21/11/2026: o bipe, mesmo com o
+     * teto de volume, acordava a casa e atrapalhava responder a missão.
+     */
     private fun loudSound(s: Session, now: Long = System.currentTimeMillis()): Int {
         val c = Repo.config
         val naMusica = c.musicFirst && s.phase == Phase.RINGING &&

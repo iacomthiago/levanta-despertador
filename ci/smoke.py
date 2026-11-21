@@ -3,7 +3,7 @@
 
 Instala o APK, dispara o alarme de teste com a tela apagada e cumpre o ciclo
 inteiro: questões -> contas -> frase -> espera -> checagem -> bom dia. Depois
-confere a recaída e a troca da música pelo bipe. Em seguida usa as telas do
+confere a recaída e a troca da música pelo canto de pássaros. Em seguida usa as telas do
 Disciplina: estudo em blocos de 30 minutos (marca, desmarca), missão simples com o
 alarme que para com um toque, treino, ideias e a experiência somada. Por fim,
 os avisos de hora de dormir. Salva capturas de tela em ci-out/ e falha se o
@@ -679,7 +679,7 @@ def main():
                 if esperar("Você levantou.", 20):
                     shot("12-bom-dia-com-recaida")
 
-    # Terceira rodada: sem missão cumprida, a música tem que virar bipe em 60 s.
+    # Terceira rodada: sem missão cumprida, a música tem que virar o canto de pássaros em 60 s.
     tocar_em("Fechar", 10)
     sh(f"am start -n {PKG}/.MainActivity")
     time.sleep(3)
@@ -691,13 +691,13 @@ def main():
     log(f"áudio no começo: {som}")
     if "CONTENT_TYPE_MUSIC" not in som:
         problemas.append(f"A terceira rodada não começou pela música: {som!r}")
-    log("esperando a música virar bipe (60 s depois do toque)")
+    log("esperando a música virar o canto de pássaros (60 s depois do toque)")
     time.sleep(60)
     som = sh(tocando).strip()
     log(f"áudio depois de 60 s: {som}")
     if "CONTENT_TYPE_SONIFICATION" not in som:
-        problemas.append(f"A música não virou bipe depois de 60 s: {som!r}")
-    shot("13-bipe")
+        problemas.append(f"A música não virou o canto de pássaros depois de 60 s: {som!r}")
+    shot("13-passaros")
     if tocar_em("Começar missão", 20) and cumprir_missoes("14"):
         if esperar("Você continua de pé?", 50):
             tocar_em("Estou de pé")

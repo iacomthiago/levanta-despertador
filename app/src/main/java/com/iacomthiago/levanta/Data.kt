@@ -100,7 +100,7 @@ data class Config(
     val affirmation: String = DEFAULT_AFFIRMATION,
     /** O que o app responde em voz alta depois de ouvir a afirmação; vazio desliga a resposta. */
     val encouragement: String = DEFAULT_ENCOURAGEMENT,
-    /** Começa com a música; depois de [musicSeconds] sem missão cumprida, vira o bipe. */
+    /** Começa com a música; depois de [musicSeconds] sem missão cumprida, vira o canto de pássaros. */
     val musicFirst: Boolean = true,
     val musicSeconds: Int = 60,
     /** Data da prova no formato dd/mm/aaaa; vazio desliga a contagem. */

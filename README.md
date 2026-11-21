@@ -29,7 +29,7 @@ Quem já usava o Levanta não perde nada ao atualizar: os alarmes viram missões
 
 ## O despertador (missão de levantar)
 
-1. **Toca na hora.** Acende a tela por cima do bloqueio e sobe até o volume máximo escolhido em Ajustes (75% do volume do aparelho, por padrão). Começa com a abertura da série HOTARU; se a missão não for cumprida em 60 segundos, a música vira um bipe insistente. Os botões de volume do aparelho não fazem nada enquanto ele toca.
+1. **Toca na hora.** Acende a tela por cima do bloqueio e sobe até o volume máximo escolhido em Ajustes (75% do volume do aparelho, por padrão). Começa com a abertura da série HOTARU; se a missão não for cumprida em 60 segundos, a música vira um canto de pássaros (feito no próprio app, mais baixo que a música). Os botões de volume do aparelho não fazem nada enquanto ele toca.
 2. **Missão para desligar.** Uma ou mais, na ordem:
    - **Código em outro cômodo:** ler com a câmera um código de barras ou QR code que você cadastrou (a pasta de dente no banheiro, por exemplo).
    - **Questões do concurso:** afirmações de certo ou errado sobre Constituição e Licitações, até somar o número de acertos pedido. Errou, lê a explicação e responde outra. Primeiro aparecem as que você errou e as que ainda não viu.
